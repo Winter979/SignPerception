@@ -4,6 +4,7 @@ import glob
 
 import Task1 as t1
 import Task2 as t2
+import Task1_2 as t1_2
 
 def Setup_Args():
    parser = argparse.ArgumentParser(description="Analyze Packet Dump for anomalies")
@@ -28,8 +29,8 @@ def Get_Files(task_no, file_no):
             file_no = int(file_no[1:])
             files = files[:file_no]
          elif file_no.endswith("-"):
-            file_no = file_no[:-1]
-            files = files[int(file_no):]
+            file_no = int(file_no[:-1])
+            files = files[file_no:]
          else:
             split = file_no.split("-")
             files = files[int(split[0]):int(split[1])+1]
@@ -49,7 +50,7 @@ if __name__ == "__main__":
       files = Get_Files(task_no,args.files)
 
       if task_no == 1:
-         t1.main(files)
+         t1_2.main(files)
       elif task_no == 2:
          t2.main(files)
    except Exception as e:

@@ -1,168 +1,186 @@
 import cv2
-import numpy as np
+import glob
 import imutils
+
+import numpy as np
 
 from Tools import *
 
-
-
-def Filter_Image(image):
-
-   gray, hsv = Cvt_All(image)
-
-   masks = []
-
-   masks.append(Create_Mask(hsv, "white"))
-   red_mask1 = Create_Mask(hsv, "red1")
-   red_mask2 = Create_Mask(hsv, "red2")
-   masks.append(red_mask1 + red_mask2)
-
-   masks.append(Create_Mask(hsv, "brown"))
-   masks.append(Create_Mask(hsv, "green"))
-   masks.append(Create_Mask(hsv, "yellow"))
-   masks.append(Create_Mask(hsv, "shadow"))
-   masks.append(Create_Mask(hsv, "pink"))
-   masks.append(Create_Mask(hsv, "p_red"))
-
-   ultimate_mask = np.zeros(image.shape[:2], np.uint8)
+def Contour_Mask(orig_mask):
    
-   ii = 0
-   for mask in masks:
-      # cv2.imshow(str(ii), mask)
-      ultimate_mask += mask
-      ii += 1
+   mask = orig_mask.copy()
+   for ii in range(5):
+      mask = cv2.medianBlur(mask, 51)
+   
+   # mask = np.ones(orig_mask.shape[:2],dtype="uint8") * 255
 
-   ultimate_mask = cv2.medianBlur(ultimate_mask,7)
-   Trim_Edges(ultimate_mask)
-   # cv2.imshow("ultimate", ultimate_mask)
+   # cnts = cv2.findContours(~orig_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   # cnts = imutils.grab_contours(cnts) 
 
-   return ultimate_mask
+   # cv2.drawContours(mask, cnts, -1, 0, -1)
 
-def Extract_Contours(mask):
+   return mask
 
-   cnts = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-   cnts = imutils.grab_contours(cnts)
-
+def Find_Possible(mask):
+   cnts = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   cnts = imutils.grab_contours(cnts)  
+   
    new = np.ones(mask.shape[:2],dtype="uint8") * 255
 
-   image_area = mask.size
-
-   b_cnts = []
-
    for c in cnts:
-      area = cv2.contourArea(c)
-      # print(area)
-      if 0.02*image_area < area < 0.1*image_area:
-         x,y,w,h = cv2.boundingRect(c)
-         ratio = w/h
-         if 1 < ratio < 2:
-            cv2.drawContours(new, [c], -1, 0, -1)
-            b_cnts.append(c)
+      x,y,w,h = cv2.boundingRect(c)
+      area = w*h
 
-   return new, b_cnts
+      rect = cv2.minAreaRect(c)
+      (x1,x2),(w1,h1),angle = rect
 
-def Get_Sign(full_image, full_mask, m_cnts):
+      angle = abs(angle)
 
-   # masked = Apply_Mask_Image(image, mask)
+      if 400 < area < 4000:
+         # print(rect)
+         ratio = h/w
+         if 1 < ratio < 3:
+            if angle < 30 or angle > 60:
+               cv2.drawContours(new,[c],-1,0,-1)
 
-   for m_c in m_cnts:
-      x,y,w,h = cv2.boundingRect(m_c)
+   return new
 
-      mask = full_mask[y:y+h,x:x+w]
-      image = full_image[y:y+h,x:x+w]
-           
-      temp = Apply_Mask_Image(image, mask)
-      temp,_ = Cvt_All(temp)
-      _, temp = cv2.threshold(temp, 150, 255, cv2.THRESH_BINARY)
-      Trim_Edges(temp, color = 0, width=5)
+def Group_Letters(image, mask):
 
-      temp[np.where(mask != 0)] = 0
-
-      Get_Letters(temp, image)
-
-   # masked = Apply_Mask_Image(image, mask)
-   # cv2.imshow("masked",masked)
-
-def Get_Letters(full_mask, full_image):
-   cnts = cv2.findContours(full_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+   cnts = cv2.findContours(~mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
    cnts = imutils.grab_contours(cnts)
 
-   ii = 0
+   count = len(cnts)
 
+   # Not enough
+   if count < 3:
+      return 
+
+   better = []
+
+   miny = image.shape[0]
+   maxy = 0
+
+   # Remove the small ones
    for c in cnts:
-      area = cv2.contourArea(c)
-      # You found a letter (Probably)
-      if area > 100:
-         x,y,w,h = cv2.boundingRect(c)
-         mask = full_mask[y:y+h,x:x+w]
-         image = full_image[y:y+h,x:x+w]
-         Get_Letter(mask, image, ii)
-         ii += 1
+      x,y,w,h = cv2.boundingRect(c)
+      ratio = h/w
+      area = w*h
+
+      # rect = cv2.minAreaRect(c)
+      # (x1,x2),(w1,h1),angle = rect
+
+      # angle = abs(angle)
+
+      if 1 < ratio < 3 and area > 300:
+         better.append(c)
+
+         maxy = y if y > maxy else maxy
+         miny = y if y < miny else miny
+
+
+   by_y = sorted(better, key=lambda x: cv2.boundingRect(x)[1])
+
+   rng = 50
+
+   groups = []
+
+   for ii in range(miny, maxy, rng):
+
+      lower = ii
+      upper = ii + rng
+
+      group = []
+      temp = by_y.copy()
+
+      for jj in range(len(temp)):
+         c = temp[jj]
+         y = cv2.boundingRect(c)[1]
+
+         # Its within range
+         if lower <= y <= upper:
+            group.append(c)
+         # Will no longe fit in any of them
+         elif y < lower:
+            by_y.remove(c)
+         # No more are within range
+         elif y > upper:
+            break
+            
+      # Expecting more than 2 numbers
+      if len(group) > 2:
+         groups.append(group)
+
+
+   if len(groups) == 1:
+      letters = groups[0]
+      # cv2.drawContours(image,letters,-1,(0,255,0),2)
+
+      x1,y1,w,h = cv2.boundingRect(letters[0])
+
+      x2 = x1 + w
+      y2 = y1 + h
+
+      for l in letters:
+         x,y,w,h = cv2.boundingRect(l)
          
+         if x < x1:
+            x1 = x
+         if y < y1:
+            y1 = y
 
-def Get_Letter(mask, image, ii):
-   cv2.imshow("letter-{}".format(ii), mask)
+         x += w
+         y += h
 
-   cuts = 5
+         if x > x2:
+            x2 = x
+         if y > y2:
+            y2 = y
 
-   h,w,_ = image.shape
+      x1 -= 5
+      y1 -= 5
+      x2 += 5
+      y2 += 5
 
-   cell_width = w//cuts
-   cell_height = h//cuts
-
-   quads = []
-
-   for ii in range(cuts):
-      for jj in range(cuts):
-         x = cell_width * ii
-         y = cell_height * jj
-
-         crop = mask[y:y+cell_height,x:x+cell_width]
-
-         ratio = Get_Ratio(crop)
-
-         quads.append(ratio)
-
-   print(",".join("%.3f" % q for q in quads))
-
-def Get_Ratio(image):
-
-   cells = 0
-   count = 0
-
-   h,w = image.shape
-
-   for x in range(w):
-      for y in range(h):
-         count += 1
-         if image[y,x] == 255:
-            cells += 1
-      
-   ratio = cells / count
-
-   return ratio
+      cv2.rectangle(image, (x1,y1),(x2,y2), (0,255,0), 2)
 
 def main(files):
    for f in files:
       image = cv2.imread(f)
 
-      # blur = image.copy()
-      blur = cv2.bilateralFilter(image, 15,50,50)
+      # image = cv2.medianBlur(image, 5)
+      # _,gray = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
 
-      dark_mask = ~Create_Mask(blur, "dark")
+      _,white = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY_INV)
+      _,dark  = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY)
 
-      mask = Filter_Image(blur)
+      temp = np.ones(image.shape[:2],dtype="uint8") * 255
+      temp[np.where((white == [0,0,0]).all(axis=2))] = 0
 
-      # Create the combined mask
-      combined = dark_mask + mask
-      # combined = cv2.medianBlur(combined, 7)
-      combined[np.where(combined != 0)] = 255
+      dark_mask = np.ones(image.shape[:2],dtype="uint8") * 255
+      dark_mask[np.where((dark == [0,0,0]).all(axis=2))] = 0
+      
+      Trim_Edges(temp, color=0, width=5)
+      Trim_Edges(dark_mask, color=255, width=5)
+      
+      poss = Find_Possible(temp)
 
-      new_mask,cnts = Extract_Contours(combined)
+      mask = Contour_Mask(dark_mask)
 
-      Get_Sign(image, new_mask, cnts)
+      new = poss + mask
+
+      new[np.where(new != 0)] = 255
+
+      Group_Letters(image, new)
 
       cv2.imshow("image",image)
+      # cv2.imshow("dark_mask",dark_mask)
+      # cv2.imshow("poss",poss)
+      # cv2.imshow("mask",mask)
+      cv2.imshow("new",new)
       
       cv2.waitKey(0)
-      cv2.destroyAllWindows()
+      
+if __name__ == "__main__":
+   files = glob.glob("DirectionalSignage/*")
+   main(files)
