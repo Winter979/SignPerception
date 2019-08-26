@@ -1,6 +1,7 @@
 import cv2
 import glob
 import numpy as np
+import imutils
 
 MASKS = {
    # BGR Masks
@@ -16,6 +17,29 @@ MASKS = {
    "green"  : [np.array([ 41, 60, 64]) , np.array([ 90,255,255])],
    "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])]
 }
+
+def Gold_Mask(image):
+   gray,hsv = Cvt_All(image)
+
+   lower = np.array([10,100,100])
+   upper = np.array([80,255,255])
+   inrange = cv2.inRange(hsv, lower, upper)
+
+   inrange = cv2.medianBlur(inrange, 5)
+
+   cnts = cv2.findContours(~inrange, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+   cnts = imutils.grab_contours(cnts)
+
+   for c in cnts:
+      area = cv2.contourArea(c)
+
+      if area < 1000:
+         cv2.drawContours(inrange, [c], 0, 255, -1)
+         
+   inrange[np.where(inrange != 0)] = 255
+
+   return inrange
+
 
 def Create_Mask(image, color):
 
@@ -51,21 +75,6 @@ def Apply_Mask_Image(image, mask):
    new[np.where(mask != 0)] = [255,255,255]
 
    return new
-
-def Get_Files(part=1, test=False):
-
-   if part == 1:
-      if test:
-         files = ["./BuildingSignage/BS08.jpg"]
-      else:
-         files = glob.glob("BuildingSignage/*")
-   elif part == 2:
-      if test:
-         files = ["./BuildingSignage/DS02.jpg"]
-      else:
-         files = glob.glob("DirectionalSignage/*")
-
-   return files
 
 def Cvt_All(image):
    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
