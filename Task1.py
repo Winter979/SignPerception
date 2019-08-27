@@ -169,7 +169,7 @@ def Group_Letters(image, mask):
       Process_Letters(image, letters)
 
       image_crop = image[y1:y2,x1:x2]
-      cv2.imshow("crop", image_crop)
+      # cv2.imshow("crop", image_crop)
       cv2.rectangle(image, (x1,y1),(x2,y2), (0,255,0), 2)
 
 def Process_Letters(image, letters):
@@ -185,6 +185,8 @@ def Process_Letters(image, letters):
    # expected = ANSWERS.pop(0)
    # print(expected)
 
+   guess = ""
+
    for l in letters:
       x,y,w,h = cv2.boundingRect(l)
 
@@ -192,9 +194,14 @@ def Process_Letters(image, letters):
       image_crop = image[y:y+h,x:x+w]
 
       # cv2.rectangle(image, (x-2,y-2),(x+w+2,y+h+2), (0,0,255), 1)
-      cv2.imshow("letter-{}".format(ii), image_crop)
+      # cv2.imshow("letter-{}".format(ii), image_crop)
 
       ratio = Get_Ratio(mask_crop)
+
+      letter = Guess_Letter(ratio)
+
+      guess += letter
+
       ii += 1
 
       # with open("answers.txt","a+") as f:
@@ -202,32 +209,7 @@ def Process_Letters(image, letters):
          
          # f.write("{}:{}\n".format(expected.pop(0), temp))
 
-def Get_Ratio(mask):
-   
-   h,w = mask.shape
-
-   cuts = 5
-   cell_width = w//cuts
-   cell_height = h//cuts
-
-   ratios = []
-
-   for ii in range(cuts):
-      for jj in range(cuts):
-         cells = 0
-         count = 0
-
-         x = cell_width * ii
-         y = cell_height * jj
-
-         for x1 in range(x,x+cell_width):
-            for y1 in range(y,y + cell_height):
-               count += 1
-               if mask[y1,x1] == 255:
-                  cells += 1
-         ratios.append(cells / count)
-
-   return ratios
+   print("Building:", guess)
 
 def main(files):
 
@@ -268,11 +250,11 @@ def main(files):
       Group_Letters(image, new)
 
       cv2.imshow("image",image)
-      # cv2.imshow("dark_mask",dark_mask)
-      # cv2.imshow("poss",poss)
-      # cv2.imshow("temp",dark_mask + new)
-      # cv2.imshow("white",white)
-      # cv2.imshow("new",new)
+      # # cv2.imshow("dark_mask",dark_mask)
+      # # cv2.imshow("poss",poss)
+      # # cv2.imshow("temp",dark_mask + new)
+      # # cv2.imshow("white",white)
+      # # cv2.imshow("new",new)
       
       cv2.waitKey(0)
       cv2.destroyAllWindows()

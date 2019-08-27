@@ -18,6 +18,14 @@ MASKS = {
    "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])]
 }
 
+KNOWN = []
+with open("./learn.txt") as f:
+   lines = f.read().splitlines()
+   for line in lines:
+      res = int(line[0])
+      ratios = [float(ii) for ii in line[2:].split(",")]
+      KNOWN.append([res,ratios])
+
 def Gold_Mask(image):
    gray,hsv = Cvt_All(image)
 
@@ -82,3 +90,55 @@ def Cvt_All(image):
    hsl = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
 
    return gray, hsv
+
+def Get_Ratio(mask):
+   
+   h,w = mask.shape
+
+   cuts = 5
+   cell_width = w//cuts
+   cell_height = h//cuts
+
+   ratios = []
+
+   for ii in range(cuts):
+      for jj in range(cuts):
+         cells = 0
+         count = 0
+
+         x = cell_width * ii
+         y = cell_height * jj
+
+         for x1 in range(x,x+cell_width):
+            for y1 in range(y,y + cell_height):
+               count += 1
+               if mask[y1,x1] == 255:
+                  cells += 1
+         ratios.append(cells / count)
+
+   return ratios
+
+def Guess_Letter(ratio):
+   global KNOWN
+   
+   guesses = []
+   
+   for ii in KNOWN:
+      diff = Ratio_Diff(ratio, ii[1])
+      if diff < 5:
+         guesses.append([diff, ii[0]])
+
+   guesses = sorted(guesses,key= lambda x :x[0])
+
+   letter = str(guesses[0][1])
+
+   return letter
+
+
+def Ratio_Diff(a,b):
+   diff = 0
+
+   for ii in range(len(a)):
+      diff += abs(a[ii]-b[ii])
+
+   return diff
