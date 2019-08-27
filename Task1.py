@@ -49,6 +49,7 @@ def Group_Letters(image, mask):
 
    # Not enough
    if count < 3:
+      print("Not enough")
       return 
 
    better = []
@@ -122,7 +123,7 @@ def Group_Letters(image, mask):
          for jj in range(len(xs)):
             if ii != jj:
                x2 = xs[jj][1]
-               if abs(x1-x2) < 50:
+               if abs(x1-x2) < 60:
                   ok = True
                   break
 
@@ -269,8 +270,9 @@ def main(files):
       cv2.imshow("image",image)
       # cv2.imshow("dark_mask",dark_mask)
       # cv2.imshow("poss",poss)
-      # cv2.imshow("gold_mask",gold_mask)
-      cv2.imshow("new",new)
+      # cv2.imshow("temp",dark_mask + new)
+      # cv2.imshow("white",white)
+      # cv2.imshow("new",new)
       
       cv2.waitKey(0)
       cv2.destroyAllWindows()
