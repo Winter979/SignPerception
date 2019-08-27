@@ -1,7 +1,15 @@
 import cv2
 import glob
 import numpy as np
-import imutils
+
+class Colrs:
+   RED      = "\033[1;31m"  
+   BLUE     = "\033[1;34m"
+   CYAN     = "\033[1;36m"
+   GREEN    = "\033[0;32m"
+   RESET    = "\033[0;0m"
+   BOLD     = "\033[;1m"
+   REVERSE  = "\033[;7m"
 
 MASKS = {
    # BGR Masks
@@ -35,9 +43,9 @@ def Gold_Mask(image):
 
    inrange = cv2.medianBlur(inrange, 5)
 
-   cnts = cv2.findContours(~inrange, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-   cnts = imutils.grab_contours(cnts)
-
+   res = cv2.findContours(inrange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+   
    for c in cnts:
       area = cv2.contourArea(c)
 
@@ -121,16 +129,23 @@ def Get_Ratio(mask):
 def Guess_Letter(ratio):
    global KNOWN
    
+   # print(KNOWN)
+
    guesses = []
    
    for ii in KNOWN:
       diff = Ratio_Diff(ratio, ii[1])
-      if diff < 5:
-         guesses.append([diff, ii[0]])
+      # if diff < 5:
+      guesses.append([diff, ii[0]])
 
    guesses = sorted(guesses,key= lambda x :x[0])
 
    letter = str(guesses[0][1])
+
+   # Used for writing new learning data
+   # with open("new.txt","a") as f:
+   #    temp = ",".join("%.3f" % x for x in ratio)
+   #    f.write("{}:{}\n".format(letter, temp))
 
    return letter
 
