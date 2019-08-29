@@ -25,16 +25,16 @@ def Get_Files(task_no, file_no):
    if file_no != None:
       if "-" in file_no:
          if file_no.startswith("-"):
-            file_no = int(file_no[1:])
+            file_no = int(file_no[1:])-1
             files = files[:file_no]
          elif file_no.endswith("-"):
-            file_no = int(file_no[:-1])
+            file_no = int(file_no[:-1])-1
             files = files[file_no:]
          else:
             split = file_no.split("-")
-            files = files[int(split[0]):int(split[1])+1]
+            files = files[int(split[0])-1:int(split[1])]
       else:
-         file_no = int(file_no)
+         file_no = int(file_no)-1
          files = [files[file_no]]
 
    return files

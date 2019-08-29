@@ -192,7 +192,6 @@ def Extract_Letters(image, letters, draw=False, show=False):
 
       if show:
          cv2.imshow("letter-{}".format(ii), image_crop)
-         cv2.imshow("letter-{}2".format(ii), mask_crop)
       if draw:
          cv2.rectangle(image, (x-2,y-2),(x+w+2,y+h+2), (0,0,255), 1)
 
@@ -238,7 +237,7 @@ def Get_Dark_Mask(image):
 
 def Setup_Verifier():
    data = {}
-   with open("./Excepted.txt") as f:
+   with open("./Answers.txt") as f:
       lines = f.read().splitlines()
       for line in lines:
          s = line.split(":")
@@ -298,8 +297,6 @@ def main(files):
 
             room = "".join(letters)
             
-            
-
             answer = answers[fname]
 
             if room == answer:
@@ -307,12 +304,17 @@ def main(files):
                print("{}{} : {} == {}{}".format(Colrs.CYAN,fname, answer, room,Colrs.RESET))
             else:
                print("{}{} : {} != {}{}".format(Colrs.RED,fname, answer, room, Colrs.RESET))
+            
+            # cv2.imshow("image",image)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
 
          except ValueError as e:
             print("{}{} : {}{}".format(Colrs.RED,fname, e,Colrs.RESET))
    except KeyboardInterrupt:
       tests -=1
-      sys.stdout.write("\r")
+      sys.stdout.write("\r"
+      )
       sys.stdout.flush()
       print("Tests aborted")
 
@@ -320,7 +322,6 @@ def main(files):
 
       # print(letters)
 
-      # cv2.imshow("image",image)
       # cv2.imshow("temp",temp)
       # cv2.imshow("white",white)
       # cv2.imshow("dark_mask",dark_mask)
