@@ -38,11 +38,44 @@ def main(files):
    for f in files:
       image = cv2.imread(f)
 
-      gray, hsv = Cvt_All(image)      
-      # equ = cv2.equalizeHist(gray)
+      _,new = cv2.threshold(image, 110,255, cv2.THRESH_BINARY)
 
-      clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(2,2))
-      cl1 = clahe.apply(gray)
+      temp = image.copy()
+      temp[np.any(new != [255,255,255],axis=-1)] = [0,0,0]
+
+      gray, hsv = Cvt_All(temp)      
+
+      f2 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
+                                cv2.THRESH_BINARY, 15, -1)
+
+
+      temp[np.where(f2 == 0)] = [0,0,0]
+
+      
+
+      lower = np.array([0,60,50])
+      upper = np.array([180,255,255])
+      filt = cv2.inRange(hsv, lower, upper)
+
+      temp[np.where(filt == 255)] = [0,0,0]
+      filt = cv2.medianBlur(filt, 9)
+      temp[np.where(filt == 255)] = [0,0,0]
+      # gray = cv2.equalizeHist(gray)
+      # _,new2 = cv2.threshold(gray, 130,255, cv2.THRESH_BINARY_INV)
+
+      # gray = cv2.bilateralFilter(gray, 3,50,50)
+      # mask = np.where(np.all(new == [255,255,255],axis=2))
+
+      # f2[mask] = 255
+      # Replace yellow with white
+
+      # mask = Filter_Image(image)
+
+      # f3 = cv2.medianBlur(f2, 3)
+      # Magic(image, f2)
+
+      # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(2,2))
+      # cl1 = clahe.apply(gray)
 
       # tmp = np.hstack((gray, equ, cl1))
 
@@ -53,27 +86,13 @@ def main(files):
 
       # green = cv2.inRange(hsv, lower, upper)
 
-      # _,new = cv2.threshold(gray, 120,255, cv2.THRESH_BINARY)
-      # new = cv2.medianBlur(new, 3)
-
-      # new[np.where(green == 255)] = 0
-
-      # blur = image
-      # blur = cv2.bilateralFilter(image, 3,50,50)
-      # blur = cv2.medianBlur(blur, 5)
-      # gray,_ = Cvt_All(blur)
-
-      f2 = cv2.adaptiveThreshold(cl1, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
-                                cv2.THRESH_BINARY, 15, -1)
-      # mask = Filter_Image(image)
-
-      # f3 = cv2.medianBlur(f2, 3)
-      # Magic(image, f2)
-
 
       cv2.imshow("image",image)
-      # cv2.imshow("gray",gray)
+      cv2.imshow("temp",temp)
       cv2.imshow("f2",f2)
+      cv2.imshow("filt",filt)
       # cv2.imshow("hsv",hsv)
+      # cv2.imshow("new",new)
+
       # cv2.imshow("white",white)
       cv2.waitKey(0)
