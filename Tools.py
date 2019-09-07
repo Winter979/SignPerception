@@ -15,13 +15,14 @@ MASKS = {
    # BGR Masks
    "p_red"  : [np.array([  0,  0,150]) , np.array([ 30, 30,255])],
    "dark"   : [np.array([  0,  0,  0]) , np.array([125,125,125])],
+   "p_green": [np.array([  0,200,  0]) , np.array([125,255,125])],
    # HSL Masks
    "pink"   : [np.array([100,  0,150]) , np.array([150, 30,200])],
    "white"  : [np.array([  0,  0,200]) , np.array([255, 50,255])],
    "red1"   : [np.array([  0, 50, 80]) , np.array([ 30,255,255])],
    "red2"   : [np.array([160, 50, 80]) , np.array([180,255,255])],
    "yellow" : [np.array([ 21, 60, 80]) , np.array([ 40,255,255])],
-   "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,200])],
+   "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,255])],
    "green"  : [np.array([ 41, 60, 64]) , np.array([ 90,255,255])],
    "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])]
 }
@@ -62,12 +63,15 @@ def Create_Mask(image, color):
    lower, upper = MASKS[color]
 
    mask = cv2.inRange(image, lower, upper)
-   mask = cv2.medianBlur(mask, 7)
+   # mask = cv2.medianBlur(mask, 7)
 
    return mask
 
+
 def Trim_Edges(mask, color = 255, width=3):
-   h,w = mask.shape
+   pack = mask.shape
+
+   h,w = pack[:2]
 
    for x in range(w):
       for ii in range(width):

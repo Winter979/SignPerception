@@ -4,6 +4,8 @@ import os
 import sys
 import numpy as np
 
+from Settings import Settings as s
+
 from Tools import *
 
 def Contour_Mask(orig_mask):
@@ -289,11 +291,11 @@ def main(files):
                raise ValueError("No Letters found within a X group")
 
             if len(x_groups) != 1:
-               raise ValueError("To many possbilities. Refining time")
+               raise ValueError("To many possibilities. Refining time")
             
 
-            Letters_Bounding_Box(image, x_groups[0], show=False, draw=False)
-            letters = Extract_Letters(image, x_groups[0], show=False, draw=False)
+            Letters_Bounding_Box(image, x_groups[0], show=s.show, draw=s.draw)
+            letters = Extract_Letters(image, x_groups[0], show=s.show)
 
             room = "".join(letters)
             
@@ -305,16 +307,21 @@ def main(files):
             else:
                print("{}{} : {} != {}{}".format(Colrs.RED,fname, answer, room, Colrs.RESET))
             
-            # cv2.imshow("image",image)
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
 
          except ValueError as e:
             print("{}{} : {}{}".format(Colrs.RED,fname, e,Colrs.RESET))
+
+         if s.show:
+            cv2.imshow("image",image)
+            if s.verbose:
+               cv2.imshow("white",white)
+               cv2.imshow("mask",mask)
+               cv2.imshow("dark",dark)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
    except KeyboardInterrupt:
       tests -=1
-      sys.stdout.write("\r"
-      )
+      sys.stdout.write("\r")
       sys.stdout.flush()
       print("Tests aborted")
 

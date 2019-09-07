@@ -2,97 +2,144 @@ import cv2
 import numpy as np
 from Tools import *
 
+def Magic(image):
+   mser = cv2.MSER_create(_edge_blur_size=10)
 
-def Filter_Image(image):
-   canny = cv2.Canny(image,100,200)
+   #Convert to gray scale
+   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-   cv2.imshow("canny",canny)
+   vis = image.copy()
 
-   lines = cv2.HoughLinesP(image=canny,rho=1,theta=np.pi/180, threshold=100,lines=np.array([]), minLineLength=100,maxLineGap=20)
+   #detect regions in gray scale image
+   regions, _ = mser.detectRegions(gray)
 
-   for line in lines:
-      x1,y1,x2,y2 = line[0]
-      cv2.line(image, (x1,y1),(x2,y2), (0,255,0),2)
+   hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
 
-def Magic(image, mask):
-   cnts = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-   cnts,_ = cnts if len(cnts) == 2 else cnts[1:3]
 
-   new = np.ones(mask.shape[:2],dtype="uint8") * 255
+   mask = np.zeros((image.shape[0], image.shape[1], 1), dtype=np.uint8)
 
-   for c in cnts:
+   for c in hulls:
       x,y,w,h = cv2.boundingRect(c)
 
-      a2 = cv2.contourArea(c)
-
       area = w*h
-      if 100 < area < 500:
+
+
+      if 100 < area < 700:
+         rect = cv2.minAreaRect(c)
+         (x1,x2),(w1,h1),angle = rect
+
          ratio = h/w
-         if 0.8<ratio<4:
-            cv2.drawContours(new,[c],-1,0,-1)
+         ratio2 = w1/h1
 
+         cv2.polylines(vis, [c], 2, (0, 255, 0))
+         if 0.9<ratio<1.1:
+            if 0.9<ratio2<1.1:
+               if 35 < abs(angle) < 55:
+                  cv2.drawContours(mask, [c], -1, (255, 255, 255), -1)
+
+
+   #this is used to find only text regions, remaining are ignored
+   # text_only = cv2.bitwise_and(image, image, mask=mask)
+
+   
+   cv2.imshow('mask', mask)
+   cv2.imshow('image', vis)
+   # cv2.imshow("text only", text_only)
+   cv2.waitKey(0)
+
+
+
+def Straight_Lines(image):
+
+   image = image.copy()
+
+   canny = cv2.Canny(image, 150,200)
+   lines = cv2.HoughLines(canny,1,np.pi/180,150)
+
+   print("="*20)
+   for line in lines:
+      rho,theta = line[0]
+      a = np.cos(theta)
+      b = np.sin(theta)
+
+      # print(a,b)
+
+      if b > 0.05:
+         continue
+
+      x0 = a*rho
+      y0 = b*rho
+      x1 = int(x0 + 1000*(-b))
+      y1 = int(y0 + 1000*(a))
+      x2 = int(x0 - 1000*(-b))
+      y2 = int(y0 - 1000*(a))
+
+      print(x1,y1,x2,y2)
+
+
+
+      cv2.line(image,(x1,y1),(x2,y2),(0,0,255),2)
+
+   return image
+
+def Remove_Stuff(image):
+   
+   gray, hsv = Cvt_All(image)
+   _,mask = cv2.threshold(image, 100, 255, cv2.THRESH_BINARY)
+
+   new = np.ones(image.shape[:2],dtype="uint8") * 0
+
+   new[np.where((mask == [255,255,255]).all(axis=2))] = 255
+
+   colors = ["green","brown","red1","red2","yellow"]
+   for c in colors:
+      mask = Create_Mask(hsv, c)
+      new[np.where(mask == 255)] = 255
+
+
+   cv2.imshow("image",image)
    cv2.imshow("new",new)
-
+   cv2.waitKey(0)
 
 def main(files):
    for f in files:
       image = cv2.imread(f)
 
-      _,new = cv2.threshold(image, 110,255, cv2.THRESH_BINARY)
+      blur = cv2.bilateralFilter(image, 55,75,75)
+      gray, hsv = Cvt_All(blur)
 
-      temp = image.copy()
-      temp[np.any(new != [255,255,255],axis=-1)] = [0,0,0]
+      # Remove_Stuff(blur)
 
-      gray, hsv = Cvt_All(temp)      
+      Magic(image)
 
-      f2 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
-                                cv2.THRESH_BINARY, 15, -1)
+      # cv2.imshow("image",image)
+      # cv2.waitKey(0)
 
+      # Magic(image)
 
-      temp[np.where(f2 == 0)] = [0,0,0]
+      # _,mask = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY)
 
+      # dark = np.ones(mask.shape[:2],dtype="uint8") * 255
+      # dark[np.where((mask == [0,0,0]).all(axis=2))] = 0
+      # dark[np.where((mask == [255,0,0]).all(axis=2))] = 0
+
+      # _,mask = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY)
+
+      # light = np.ones(mask.shape[:2],dtype="uint8") * 0
+      # light[np.where((mask == [255,255,255]).all(axis=2))] = 255
+
+      # new = light + dark
+
+      # colors = ["green","brown","red1","red2","yellow","white"]
+      # for c in colors:
+      #    mask = Create_Mask(hsv, c)
+      #    new[np.where(mask == 255)] = 255
       
 
-      lower = np.array([0,60,50])
-      upper = np.array([180,255,255])
-      filt = cv2.inRange(hsv, lower, upper)
-
-      temp[np.where(filt == 255)] = [0,0,0]
-      filt = cv2.medianBlur(filt, 9)
-      temp[np.where(filt == 255)] = [0,0,0]
-      # gray = cv2.equalizeHist(gray)
-      # _,new2 = cv2.threshold(gray, 130,255, cv2.THRESH_BINARY_INV)
-
-      # gray = cv2.bilateralFilter(gray, 3,50,50)
-      # mask = np.where(np.all(new == [255,255,255],axis=2))
-
-      # f2[mask] = 255
-      # Replace yellow with white
-
-      # mask = Filter_Image(image)
-
-      # f3 = cv2.medianBlur(f2, 3)
-      # Magic(image, f2)
-
-      # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(2,2))
-      # cl1 = clahe.apply(gray)
-
-      # tmp = np.hstack((gray, equ, cl1))
-
-      # white = Create_Mask(hsv, "white")
-
-      # lower = np.array([30,30,60])
-      # upper = np.array([90,255,255])
-
-      # green = cv2.inRange(hsv, lower, upper)
-
-
-      cv2.imshow("image",image)
-      cv2.imshow("temp",temp)
-      cv2.imshow("f2",f2)
-      cv2.imshow("filt",filt)
-      # cv2.imshow("hsv",hsv)
+      # cv2.imshow("image",image)
+      # cv2.imshow("dark",dark)
+      # cv2.imshow("light",light)
       # cv2.imshow("new",new)
-
-      # cv2.imshow("white",white)
-      cv2.waitKey(0)
+      
+      
+      # cv2.waitKey(0)
