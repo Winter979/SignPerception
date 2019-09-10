@@ -19,8 +19,8 @@ MASKS = {
    # HSL Masks
    "pink"   : [np.array([100,  0,150]) , np.array([150, 30,200])],
    "white"  : [np.array([  0,  0,200]) , np.array([255, 50,255])],
-   "red1"   : [np.array([  0, 50, 80]) , np.array([ 30,255,255])],
-   "red2"   : [np.array([160, 50, 80]) , np.array([180,255,255])],
+   "red1"   : [np.array([  0, 60, 80]) , np.array([ 30,255,255])],
+   "red2"   : [np.array([160, 60, 80]) , np.array([180,255,255])],
    "yellow" : [np.array([ 21, 60, 80]) , np.array([ 40,255,255])],
    "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,255])],
    "green"  : [np.array([ 41, 60, 64]) , np.array([ 90,255,255])],
@@ -57,6 +57,15 @@ def Gold_Mask(image):
 
    return inrange
 
+
+def Get_The_Sky(image):
+   hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+   lower = np.array([100,60,200])
+   upper = np.array([140,255,255])
+
+   mask = cv2.inRange(hsv,lower,upper)
+   return mask
 
 def Create_Mask(image, color):
 
@@ -137,14 +146,17 @@ def Guess_Letter(ratio):
 
    guesses = []
    
+   print("=====")
    for ii in KNOWN:
       diff = Ratio_Diff(ratio, ii[1])
-      # if diff < 5:
+      # print(ii[0],diff)
+      # if diff < 1:
       guesses.append([diff, ii[0]])
 
    guesses = sorted(guesses,key= lambda x :x[0])
 
    letter = str(guesses[0][1])
+
 
    # Used for writing new learning data
    # with open("new.txt","a") as f:
@@ -158,6 +170,12 @@ def Ratio_Diff(a,b):
    diff = 0
 
    for ii in range(len(a)):
-      diff += abs(a[ii]-b[ii])
+      if b[ii] != 0:
+         val = (a[ii]-b[ii])
+         val = val**2
+         val = val / b[ii]
+
+         # val *= len(a)
+         diff += val
 
    return diff
