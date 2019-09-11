@@ -22,9 +22,11 @@ MASKS = {
    "red1"   : [np.array([  0, 60, 80]) , np.array([ 30,255,255])],
    "red2"   : [np.array([160, 60, 80]) , np.array([180,255,255])],
    "yellow" : [np.array([ 21, 60, 80]) , np.array([ 40,255,255])],
-   "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,255])],
    "green"  : [np.array([ 41, 60, 64]) , np.array([ 90,255,255])],
-   "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])]
+   "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,255])],
+   "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])],
+   "sky"    : [np.array([100, 60,200]) , np.array([140,255,255])],
+   "dark"   : [np.array([  0, 60,200]) , np.array([255,255,255])]
 }
 
 KNOWN = []
@@ -146,7 +148,6 @@ def Guess_Letter(ratio):
 
    guesses = []
    
-   print("=====")
    for ii in KNOWN:
       diff = Ratio_Diff(ratio, ii[1])
       # print(ii[0],diff)

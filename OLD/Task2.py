@@ -4,6 +4,95 @@ from Tools import *
 
 import Testing as t
 
+
+def Find_Arrows(image):
+
+   # blur = cv2.GaussianBlur(image, (5,5),0)
+   # gray,hsv = Cvt_All(image)
+
+   # _,t1 = cv2.threshold(image, 100,255,cv2.THRESH_BINARY)
+
+   # maybe = np.zeros(image.shape[:2],dtype="uint8")
+   # maybe[np.where((t1 == [255,255,255]).all(axis=2))] = 255
+
+   # lower = np.array([0,0,100])
+   # upper = np.array([180,80,255])
+   # inrange = cv2.inRange(hsv, lower, upper)
+
+   mser = cv2.MSER_create()
+
+   #Convert to gray scale
+   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+   vis = image.copy()
+
+   #detect regions in gray scale image
+   regions, _ = mser.detectRegions(gray)
+
+   hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
+
+   mask = np.zeros((image.shape[0], image.shape[1], 1), dtype=np.uint8)
+
+   for c in hulls:
+      x,y,w,h = cv2.boundingRect(c)
+
+      area = w*h
+
+      if 100 < area < 1000:
+         rect = cv2.minAreaRect(c)
+         (x1,x2),(w1,h1),angle = rect
+
+         ratio = h/w
+         ratio2 = w1/h1
+         if 0.9<ratio<1.1:
+            if 0.9<ratio2<1.1:
+               if 40 < abs(angle) < 50:
+                  cv2.drawContours(mask, [c],0,255,-1)
+
+   return mask
+
+def Find_Negatives(image):
+
+   blur = cv2.bilateralFilter(image, 75, 50,50)
+
+   gray,hsv = Cvt_All(blur)
+
+   mask = np.zeros(image.shape[:2],dtype="uint8")
+
+   colors = ["green", "red1","red2","yellow","sky","brown"]
+   for c in colors:
+      temp = Create_Mask(hsv, c)
+      mask = cv2.bitwise_or(mask,temp)
+
+   mask = cv2.medianBlur(mask, 3)
+
+   return mask
+
+def Find_Light(image):
+   _,f1 = cv2.threshold(image, 100,255,cv2.THRESH_BINARY)
+   mask = np.zeros(image.shape[:2],dtype="uint8")
+   mask[np.where((f1 == [255,255,255]).all(axis=2))] = 255
+
+   gray,hsv = Cvt_All(image)
+
+   canny = cv2.Canny(image,50,100)
+
+   kernel = np.ones((9,9),np.uint8)
+   closing = cv2.morphologyEx(canny, cv2.MORPH_CLOSE, kernel)
+
+   th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+            cv2.THRESH_BINARY,5,0)
+
+   th4 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+            cv2.THRESH_BINARY,55,0)
+
+   mask[np.where(closing == 0)] = 0
+   mask[np.where(th3 == 0)] = 0
+   mask[np.where(th4 == 0)] = 0
+
+   return mask
+
+
 def Magic(image):
    mser = cv2.MSER_create()
 
