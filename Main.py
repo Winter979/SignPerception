@@ -14,6 +14,7 @@ def Setup_Args():
    parser.add_argument("-v","--verbose",dest="verbose", action="store_true", help="Enable verbose mode")
    parser.add_argument("-s","--show",dest="show", action="store_true", help="Display the images")
    parser.add_argument("-m","--manual", dest="manual", help="Manually select a single image")
+   parser.add_argument("--train",dest="train",action="store_true",help="Manually enter the results to train it")
    return parser.parse_args()
 
 def Get_Files(task_no, file_no):
@@ -52,6 +53,7 @@ if __name__ == "__main__":
    files = Get_Files(task_no,args.files)
 
    s.show = args.show
+   s.train = args.train
 
    if task_no == 1:
       t1.main(files)

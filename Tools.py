@@ -1,6 +1,8 @@
 import cv2
-import glob
 import numpy as np
+
+
+from Settings import Settings as s
 
 class Colrs:
    RED      = "\033[1;31m"  
@@ -33,7 +35,7 @@ KNOWN = []
 with open("./learn.txt") as f:
    lines = f.read().splitlines()
    for line in lines:
-      res = int(line[0])
+      res = line[0]
       ratios = [float(ii) for ii in line[2:].split(",")]
       KNOWN.append([res,ratios])
 
@@ -116,6 +118,9 @@ def Cvt_All(image):
 
 def Get_Ratio(mask):
    
+   
+   # cv2.waitKey(0)
+   # cv2.destroyWindow("temp")
    h,w = mask.shape
 
    cuts = 5
@@ -150,19 +155,31 @@ def Guess_Letter(ratio):
    
    for ii in KNOWN:
       diff = Ratio_Diff(ratio, ii[1])
-      # print(ii[0],diff)
-      # if diff < 1:
-      guesses.append([diff, ii[0]])
+      if diff < 5:
+         guesses.append([diff, ii[0]])
+
+   # print(len(guesses))
+
 
    guesses = sorted(guesses,key= lambda x :x[0])
 
-   letter = str(guesses[0][1])
 
 
-   # Used for writing new learning data
-   # with open("new.txt","a") as f:
-   #    temp = ",".join("%.3f" % x for x in ratio)
-   #    f.write("{}:{}\n".format(letter, temp))
+   if guesses[0][0] < 0.00001:
+      # Letter is already known
+      letter = str(guesses[0][1])
+   elif s.train:
+      letter = input("Letter: ")
+      # Add it to the file
+      with open("learn.txt","a") as f:
+         temp = ",".join("%.3f" % x for x in ratio)
+         f.write("{}:{}\n".format(letter, temp))
+   else: # Lets just guess it
+      results = [i[1] for i in guesses]
+      guesses = guesses[:5]
+      probs = max(set(results), key = results.count) 
+      letter = probs
+
 
    return letter
 
