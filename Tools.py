@@ -48,6 +48,8 @@ def Gold_Mask(image):
 
    inrange = cv2.medianBlur(inrange, 5)
 
+   # Trim_Edges(inrange)
+
    res = cv2.findContours(inrange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
    cnts,_ = res if len(res) == 2 else res[1:3]
    

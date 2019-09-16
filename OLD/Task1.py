@@ -1,171 +1,355 @@
 import cv2
+import glob
+import os
+import sys
 import numpy as np
-import imutils
+
+from Settings import Settings as s
 
 from Tools import *
 
-
-
-def Filter_Image(image):
-
-   gray, hsv = Cvt_All(image)
-
-   masks = []
-
-   masks.append(Create_Mask(hsv, "white"))
-   red_mask1 = Create_Mask(hsv, "red1")
-   red_mask2 = Create_Mask(hsv, "red2")
-   masks.append(red_mask1 + red_mask2)
-
-   masks.append(Create_Mask(hsv, "brown"))
-   masks.append(Create_Mask(hsv, "green"))
-   masks.append(Create_Mask(hsv, "yellow"))
-   masks.append(Create_Mask(hsv, "shadow"))
-   masks.append(Create_Mask(hsv, "pink"))
-   masks.append(Create_Mask(hsv, "p_red"))
-
-   ultimate_mask = np.zeros(image.shape[:2], np.uint8)
+def Contour_Mask(orig_mask):
    
-   ii = 0
-   for mask in masks:
-      # cv2.imshow(str(ii), mask)
-      ultimate_mask += mask
-      ii += 1
+   mask = orig_mask.copy()
+   for ii in range(5):
+      mask = cv2.medianBlur(mask, 51)
 
-   ultimate_mask = cv2.medianBlur(ultimate_mask,7)
-   Trim_Edges(ultimate_mask)
-   # cv2.imshow("ultimate", ultimate_mask)
+   return mask
 
-   return ultimate_mask
+def Find_Possible(mask):
+   res = cv2.findContours(~mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
 
-def Extract_Contours(mask):
-
-   cnts = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-   cnts = imutils.grab_contours(cnts)
-
+   # cnts = imutils.grab_contours(cnts)  
+   
    new = np.ones(mask.shape[:2],dtype="uint8") * 255
 
-   image_area = mask.size
-
-   b_cnts = []
-
    for c in cnts:
-      area = cv2.contourArea(c)
-      # print(area)
-      if 0.02*image_area < area < 0.1*image_area:
-         x,y,w,h = cv2.boundingRect(c)
-         ratio = w/h
-         if 1 < ratio < 2:
-            cv2.drawContours(new, [c], -1, 0, -1)
-            b_cnts.append(c)
+      x,y,w,h = cv2.boundingRect(c)
+      area = w*h
+      
+      area2 = cv2.contourArea(c)
 
-   return new, b_cnts
+      rect = cv2.minAreaRect(c)
+      (x1,x2),(w1,h1),angle = rect
 
-def Get_Sign(full_image, full_mask, m_cnts):
+      angle = abs(angle)
 
-   # masked = Apply_Mask_Image(image, mask)
+      if 200 < area < 4000 and area2 > 100:
+         ratio = h/w
+         if 1 < ratio < 4:
+            cv2.drawContours(new,[c],-1,0,-1)
 
-   # cv2.imshow("mask", full_mask)
+   return new
 
-   for m_c in m_cnts:
-      x,y,w,h = cv2.boundingRect(m_c)
+def Possible_Letters(mask):
+   res = cv2.findContours(~mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
 
-      mask = full_mask[y:y+h,x:x+w]
-      image = full_image[y:y+h,x:x+w]
-           
-      temp = Apply_Mask_Image(image, mask)
-      temp,_ = Cvt_All(temp)
-      _, temp = cv2.threshold(temp, 150, 255, cv2.THRESH_BINARY)
-      Trim_Edges(temp, color = 0, width=5)
+   count = len(cnts)
 
-      temp[np.where(mask != 0)] = 0
+   # Not enough
+   if count < 3:
+      return None
 
-      Get_Letters(temp, image)
+   better = []
 
-   # masked = Apply_Mask_Image(image, mask)
-   # cv2.imshow("masked",masked)
+   # Remove the small ones
+   for c in cnts:
+      x,y,w,h = cv2.boundingRect(c)
+      ratio = h/w
+      area = w*h
+      area2 = cv2.contourArea(c)
 
-def Get_Letters(full_mask, full_image):
-   cnts = cv2.findContours(full_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-   cnts = imutils.grab_contours(cnts)
+      if 1 < ratio < 3 and area > 300 and area2 > 100:
+         better.append(c)
 
+
+   return better
+
+def Group_By_Y(cnts):
+   by_y = sorted(cnts, key=lambda x: cv2.boundingRect(x)[1])
+
+   miny = cv2.boundingRect(by_y[0])[1]
+   maxy = cv2.boundingRect(by_y[-1])[1]
+
+   rng = 50
+
+   groups = []
+
+   for ii in range(miny, maxy+1, rng):
+
+      lower = ii
+      upper = ii + rng
+
+      group = []
+      temp = by_y.copy()
+
+      for jj in range(len(temp)):
+         c = temp[jj]
+         y = cv2.boundingRect(c)[1]
+
+         # Its within range
+         if lower <= y <= upper:
+            group.append(c)
+         # Will no longe fit in any of them so remove it (makes looping faster..theoretically)
+         elif y < lower:
+            by_y.remove(c)
+         # No more are within range
+         elif y > upper:
+            break
+            
+      # Expecting more than 2 numbers
+      if len(group) > 2:
+         groups.append(group)
+
+   if len(groups) == 0:
+      return None
+
+   return groups
+
+def Group_By_X(y_groups):
+   filtered = []
+
+   # Remove large x gaps
+   for g in y_groups:
+      xs = []
+      for c in g:
+         x = cv2.boundingRect(c)[0]
+         xs.append([c,x])
+      
+      good = []
+      for ii in range(len(xs)):
+         x1 = xs[ii][1]
+         ok = False 
+         for jj in range(len(xs)):
+            if ii != jj:
+               x2 = xs[jj][1]
+               if abs(x1-x2) < 60:
+                  ok = True
+                  break
+
+         if ok:
+            good.append(xs[ii][0])
+
+      if len(good) == 3:
+         filtered.append(good)
+
+   sorts = []
+   for temp in filtered:
+      sorts.append(sorted(temp, key=lambda x: cv2.boundingRect(x)[0]))
+
+   return sorts
+
+def Letters_Bounding_Box(image, letters, show=False, draw=False):
+   x1,y1,w,h = cv2.boundingRect(letters[0])
+
+   x2 = x1 + w
+   y2 = y1 + h
+
+   for l in letters:
+      x,y,w,h = cv2.boundingRect(l)
+      
+      if x < x1:
+         x1 = x
+      if y < y1:
+         y1 = y
+
+      x += w
+      y += h
+
+      if x > x2:
+         x2 = x
+      if y > y2:
+         y2 = y
+
+   # Add some padding to the crop
+   x1 -= 10
+   y1 -= 10
+   x2 += 10
+   y2 += 10
+
+   image_crop = image[y1:y2,x1:x2]
+
+   if show:
+      cv2.imshow("crop", image_crop)
+   if draw:
+      cv2.rectangle(image, (x1,y1),(x2,y2), (0,255,0), 2)
+
+   return x1,y1,x2,y2
+
+def Extract_Letters(image, letters, draw=False, show=False):
    ii = 0
 
-   for c in cnts:
-      area = cv2.contourArea(c)
-      # You found a letter (Probably)
-      if area > 100:
-         x,y,w,h = cv2.boundingRect(c)
-         mask = full_mask[y:y+h,x:x+w]
-         image = full_image[y:y+h,x:x+w]
-         Get_Letter(mask, image, ii)
-         ii += 1
-         
+   # Reapply threshold to the numbers
+   _,mask = cv2.threshold(cv2.cvtColor(image,cv2.COLOR_BGR2GRAY), 125, 255, cv2.THRESH_BINARY)
 
-def Get_Letter(mask, image, ii):
-   cv2.imshow("letter-{}".format(ii), mask)
+   guess = []
 
-   cuts = 5
+   for l in letters:
+      x,y,w,h = cv2.boundingRect(l)
 
-   h,w,_ = image.shape
+      mask_crop = mask[y:y+h,x:x+w]
+      image_crop = image[y:y+h,x:x+w]
 
-   cell_width = w//cuts
-   cell_height = h//cuts
+      if show:
+         cv2.imshow("letter-{}".format(ii), image_crop)
+      if draw:
+         cv2.rectangle(image, (x-2,y-2),(x+w+2,y+h+2), (0,0,255), 1)
 
-   quads = []
+      ratio = Get_Ratio(mask_crop)
+      letter = Guess_Letter(ratio)
 
-   for ii in range(cuts):
-      for jj in range(cuts):
-         x = cell_width * ii
-         y = cell_height * jj
+      guess.append(letter)
 
-         crop = mask[y:y+cell_height,x:x+cell_width]
+      ii += 1
 
-         ratio = Get_Ratio(crop)
+   return guess
 
-         quads.append(ratio)
+def Get_White_Mask(image):
+   _,mask = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY_INV)
+   
+   # Convert mask to white & black
+   binary = np.ones(image.shape[:2],dtype="uint8") * 255
+   binary[np.where((mask == [0,0,0]).all(axis=2))] = 0
 
-   # print(",".join("%.3f" % q for q in quads))
+   # Trim the edges to assist in contour functions
+   Trim_Edges(binary, color=255, width=5)
 
-def Get_Ratio(image):
+   # Remove any light areas that are gold (Signs arent gold)
+   gold_mask = Gold_Mask(image)
+   binary[np.where(gold_mask == 255)] = 255
 
-   cells = 0
-   count = 0
+   # Only keep areas that could be a number
+   binary = Find_Possible(binary)
 
-   h,w = image.shape
+   return binary
 
-   for x in range(w):
-      for y in range(h):
-         count += 1
-         if image[y,x] == 255:
-            cells += 1
-      
-   ratio = cells / count
+def Get_Dark_Mask(image):
+   _,mask = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY)
+   
+   # Convert mask to white & black
+   binary = np.ones(image.shape[:2],dtype="uint8") * 255
+   binary[np.where((mask == [0,0,0]).all(axis=2))] = 0
 
-   return ratio
+   # Trim the edges to assist in contour functions
+   Trim_Edges(binary, color=255, width=5)
+
+   return binary
+
+def Setup_Verifier():
+   data = {}
+   with open("./Answers.txt") as f:
+      lines = f.read().splitlines()
+      for line in lines:
+         s = line.split(":")
+         name = s[0]
+         answer = s[1]
+         data[name] = answer
+
+   return data
 
 def main(files):
-   for f in files:
-      image = cv2.imread(f)
 
-      blur = image.copy()  
-      # blur = cv2.bilateralFilter(image, 15,50,50)
+   answers = Setup_Verifier()
 
-      dark_mask = ~Create_Mask(blur, "dark")
+   tests = 0
+   passed = 0
 
-      mask = Filter_Image(blur)
+   try:
 
-      # Create the combined mask
-      combined = dark_mask + mask
-      combined = cv2.medianBlur(combined, 7)
-      combined[np.where(combined != 0)] = 255
+      for f in files:
+         tests += 1
+         # The name of the file (Used for the final printing)
+         fname = os.path.basename(f).split(".")[0]
 
-      new_mask,cnts = Extract_Contours(combined)
+         try:
 
-      Get_Sign(image, new_mask, cnts)
+            image = cv2.imread(f)      
 
-      cv2.imshow("image",image)
-      cv2.imshow("combined",combined)
+            white = Get_White_Mask(image)
+            dark = Get_Dark_Mask(image)
+
+            filled_dark = Contour_Mask(dark)
+
+            # Create the final mask + cleanup
+            mask = white + filled_dark
+            mask[np.where(mask != 0)] = 255
+
+            # letter_groups = Group_Letters(image, mask)
+            
+            cv2.imshow("dark",dark)
+            cv2.imshow("white",white)
+            cv2.imshow("mask",mask)
+
+            cnts = Possible_Letters(mask)
+            if cnts == None:
+               raise ValueError("No possibilities Found")
+
+            y_groups = Group_By_Y(cnts)
+            if y_groups == None:
+               raise ValueError("No Letters found within a Y group")
+
+            x_groups = Group_By_X(y_groups)
+            if x_groups == None:
+               raise ValueError("No Letters found within a X group")
+
+            if len(x_groups) != 1:
+               raise ValueError("To many possibilities. Refining time")
+            
+
+            Letters_Bounding_Box(image, x_groups[0], show=s.show, draw=s.draw)
+            letters = Extract_Letters(image, x_groups[0], show=s.show)
+
+            room = "".join(letters)
+            
+            print(room)
+            cv2.imshow("image",image)
+            if s.verbose:
+               cv2.imshow("white",white)
+               cv2.imshow("mask",mask)
+               cv2.imshow("dark",dark)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            continue
+
+            answer = answers[fname]
+
+            if room == answer:
+               passed += 1
+               print("{}{} : {} == {}{}".format(Colrs.CYAN,fname, answer, room,Colrs.RESET))
+            else:
+               print("{}{} : {} != {}{}".format(Colrs.RED,fname, answer, room, Colrs.RESET))
+            
+
+         except ValueError as e:
+            print("{}{} : {}{}".format(Colrs.RED,fname, e,Colrs.RESET))
+
+         if s.show:
+            cv2.imshow("image",image)
+            if s.verbose:
+               cv2.imshow("white",white)
+               cv2.imshow("mask",mask)
+               cv2.imshow("dark",dark)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+   except KeyboardInterrupt:
+      tests -=1
+      sys.stdout.write("\r")
+      sys.stdout.flush()
+      print("Tests aborted")
+
+   print("RESULTS: {}/{}".format(passed, tests))
+
+      # print(letters)
+
+      # cv2.imshow("temp",temp)
+      # cv2.imshow("white",white)
+      # cv2.imshow("dark_mask",dark_mask)
       
-      cv2.waitKey(0)
-      cv2.destroyAllWindows()
+      # cv2.waitKey(0)
+      # cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+   files = glob.glob("val_BuildingSignage/val03.jpg")
+   main(files)

@@ -142,22 +142,22 @@ def Find_Missing_Letter(image, g):
    x1,y1,w1,h1 = cv2.boundingRect(g[0])
    x2,y2,w2,h2 = cv2.boundingRect(g[1])
 
-   buff = 3
+   buff = 2
 
-   x = x1 - (x2-x1)-buff
-   y = y1 - (y2-y1)-buff
+   x = x1 - (x2-x1)- 1
+   y = y1 - (y2-y1)- buff
 
-   x2 = x+int((w1+w2)/2) + 2*buff
+   x2 = x+int((w1+w2)/2) + 3*buff
    y2 = y+int((h1+h2)/2) + 2*buff
 
    # cv2.rectangle(image,(x,y),(x2,y2),(255,0,255),1)
-
    crop = image[y:y2,x:x2]
+
    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
    # _,mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
    mask = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,7,1)
+            cv2.THRESH_BINARY,15,5)
 
    Trim_Edges(mask, width=1, color=0)
 
