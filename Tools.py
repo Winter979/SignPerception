@@ -20,7 +20,8 @@ MASKS = {
    "p_green": [np.array([  0,200,  0]) , np.array([125,255,125])],
    # HSL Masks
    "pink"   : [np.array([100,  0,150]) , np.array([150, 30,200])],
-   "white"  : [np.array([  0,  0,200]) , np.array([255, 50,255])],
+   "gold"   : [np.array([ 10,100,100]) , np.array([ 80,255,255])],
+   "white"  : [np.array([  0,  0,155]) , np.array([255, 100,255])],
    "red1"   : [np.array([  0, 60, 80]) , np.array([ 30,255,255])],
    "red2"   : [np.array([160, 60, 80]) , np.array([180,255,255])],
    "yellow" : [np.array([ 21, 60, 80]) , np.array([ 40,255,255])],
@@ -79,6 +80,8 @@ def Create_Mask(image, color):
 
    mask = cv2.inRange(image, lower, upper)
    # mask = cv2.medianBlur(mask, 7)
+
+   Trim_Edges(mask, color=0)
 
    return mask
 

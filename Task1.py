@@ -7,30 +7,34 @@ import numpy as np
 from Settings import Settings as s
 
 from Tools import *
-def Get_White_Mask(image):
-   _,mask = cv2.threshold(image, 125, 255, cv2.THRESH_BINARY_INV)
+
+def Find_Possible(mask):
+   res = cv2.findContours(~mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+
+   # cnts = imutils.grab_contours(cnts)  
    
-   # Convert mask to white & black
-   binary = np.zeros(image.shape[:2],dtype="uint8")
-   binary[np.where((mask == [0,0,0]).all(axis=2))] = 255
+   new = np.ones(mask.shape[:2],dtype="uint8") * 255
 
-   return binary
+   for c in cnts:
+      x,y,w,h = cv2.boundingRect(c)
+      area = w*h
+      
+      area2 = cv2.contourArea(c)
 
-def Better_Mask(image):
-   gray,hsv = Cvt_All(image)
+      rect = cv2.minAreaRect(c)
+      (x1,x2),(w1,h1),angle = rect
 
-   mask = Get_White_Mask(image)
+      angle = abs(angle)
 
-   th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-         cv2.THRESH_BINARY,15,0)
+      if 200 < area  and area2 > 100:
+         ratio = h/w
+         if 1 < ratio < 4:
+            cv2.drawContours(new,[c],-1,0,-1)
 
-   better = cv2.bitwise_and(mask,th3)
-
-
-
-   return better
+   return new
    
-def Dark(image):
+def Get_Mask(image):
 
    image = cv2.bilateralFilter(image, 50,75,75)
 
@@ -41,34 +45,15 @@ def Dark(image):
    defs_dark = cv2.inRange(hsv, lower, upper)
 
    th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-         cv2.THRESH_BINARY,5,0)
+         cv2.THRESH_BINARY,15,-5)
 
    return th3
 
-def MSER_IT(image):
-   mser = cv2.MSER_create()
-
-   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-   regions, _ = mser.detectRegions(gray)
-   hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
-
-   for c in hulls:
-      x,y,w,h = cv2.boundingRect(c)
-      area = w*h
-      if 100 < area < 2000:
-         ratio = h/w
-         if 1.3 < ratio < 4:
-            cv2.drawContours(image, [c], 0, (0,255,0),0)
-
-
-   return image
-
-def Find_Poss(mask):
+def Defs_Not(mask):
 
    Trim_Edges(mask, color=0)
 
-   res = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+   res = cv2.findContours(~mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
    cnts,_ = res if len(res) == 2 else res[1:3]
 
    new = np.zeros(mask.shape[:2],dtype="uint8")
@@ -77,40 +62,66 @@ def Find_Poss(mask):
       x,y,w,h = cv2.boundingRect(c)
       area = w*h
 
-      if 300 < area < 2000:
+      if 200 < area < 2500:
          ratio = h/w
 
-         if 1.25<ratio < 3:
+         if 1.2<ratio < 3:
             cv2.drawContours(new, [c],0,255,-1)
+            print(area)
          else:
-            cv2.drawContours(new, [c],0,120,-1)
+            pass
+            # cv2.drawContours(new, [c],0,125,-1)
 
 
    return new
 
+def Gold_Mask2(hsv,image):
+   
+
+   gold = Create_Mask(hsv, "gold")
+
+   Trim_Edges(gold,color=0)
+
+   gold = cv2.medianBlur(gold, 55)
+
+   res = cv2.findContours(gold, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+   
+   for c in cnts:
+      area = cv2.contourArea(c)
+
+      if area < 1000:
+         cv2.drawContours(gold, [c], 0, 255, -1)
+         # cv2.drawContours(image, [c], 0, (0,0,255), 2)
+         
+   return ~gold
 
 def main(files):
    for f in files:
       image = cv2.imread(f)
+      _,hsv = Cvt_All(image)
 
-      dark = Dark(image)
+      white = Create_Mask(hsv, "white")
 
-      temp = dark.copy()
-      temp = Find_Poss(temp)
 
-      # white = Get_White_Mask(image)
+      mask = Get_Mask(image)
+      maybe = Defs_Not(mask)
 
-      # new = cv2.bitwise_and(dark,white)
+      gold = Gold_Mask2(hsv,image)
 
-      # better = Better_Mask(image)
-      # MSER_IT(image)
+      new = cv2.bitwise_and(maybe,white)
+      new = cv2.bitwise_and(new,new,mask=gold)
 
-      # cv2.imshow("new",new)
-      cv2.imshow("temp",temp)
-      cv2.imshow("dark",dark)
+      cv2.imshow("white",white)
+      cv2.imshow("gold",gold)
+
+      cv2.imshow("new",new)
+      cv2.imshow("maybe",maybe)
+      cv2.imshow("mask",mask)
       cv2.imshow("image",image)
       cv2.waitKey(0)
 
 if __name__ == "__main__":
-   files = glob.glob("BuildingSignage/*.jpg")
+   # files = glob.glob("val_BuildingSignage/*.jpg")
+   files = glob.glob("val_DirectionalSignage/*.jpg")
    main(files)
