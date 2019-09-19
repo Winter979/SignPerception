@@ -1,6 +1,32 @@
 import cv2
 
-if __name__ == "__main__":
+def Arrows():
+   image = cv2.imread("arrow.png")
+
+   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+   _,th = cv2.threshold(gray, 125, 255, cv2.THRESH_BINARY_INV)
+
+   res = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+
+
+   x,y,w,h = cv2.boundingRect(cnts[0])      
+
+   crop = th[y:y+h,x:x+w]
+   crop = cv2.resize(crop,(50,50))
+
+   drc = ['L','U','R','D']
+
+   for d in drc:
+      cv2.imwrite("templates/{}.jpg".format(d),crop)
+      crop = cv2.rotate(crop,cv2.ROTATE_90_CLOCKWISE)
+
+   cv2.imshow("crop",crop)
+   cv2.waitKey(0)
+   
+
+def Numbers():
    image = cv2.imread("characters.png")
 
    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -38,6 +64,10 @@ if __name__ == "__main__":
       cv2.imwrite("templates/{}.jpg".format(val),crop)
 
       val += 1
+
+if __name__ == "__main__":
+   Arrows()
+   
 
       # cv2.imshow("crop",crop)
       # cv2.waitKey(0)

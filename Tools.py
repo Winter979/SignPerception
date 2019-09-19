@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
+import glob
 
+import json
 
 from Settings import Settings as s
 
@@ -29,7 +31,9 @@ MASKS = {
    "brown"  : [np.array([  5,100, 20]) , np.array([ 30,255,255])],
    "shadow" : [np.array([  0,110,  0]) , np.array([ 60,255, 80])],
    "sky"    : [np.array([100, 60,200]) , np.array([140,255,255])],
-   "dark"   : [np.array([  0, 60,200]) , np.array([255,255,255])]
+   "dark"   : [np.array([  0, 60,200]) , np.array([255,255,255])],
+   "red"    :[[np.array([  0, 80, 100]) , np.array([ 30,255,255])],
+             [np.array([160, 80, 100]) , np.array([180,255,255])]],
 }
 
 KNOWN = []
@@ -76,9 +80,20 @@ def Get_The_Sky(image):
 
 def Create_Mask(image, color):
 
-   lower, upper = MASKS[color]
 
-   mask = cv2.inRange(image, lower, upper)
+   if color == "red":
+      lower, upper = MASKS[color][0]
+      mask1 = cv2.inRange(image, lower, upper)
+
+      lower, upper = MASKS[color][1]
+      mask2 = cv2.inRange(image, lower, upper)
+
+      mask = cv2.bitwise_or(mask1, mask2)
+   else:
+      lower, upper = MASKS[color]
+      mask = cv2.inRange(image, lower, upper)
+
+
    # mask = cv2.medianBlur(mask, 7)
 
    Trim_Edges(mask, color=0)
@@ -121,84 +136,51 @@ def Cvt_All(image):
 
    return gray, hsv
 
-def Get_Ratio(mask):
-   
-   
-   # cv2.waitKey(0)
-   # cv2.destroyWindow("temp")
-   h,w = mask.shape
+def Get_Contours(mask):
+   res = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
 
-   cuts = 5
-   cell_width = w//cuts
-   cell_height = h//cuts
+   return cnts
 
-   ratios = []
 
-   for ii in range(cuts):
-      for jj in range(cuts):
-         cells = 0
-         count = 0
+def mse(imageA, imageB):
+	# the 'Mean Squared Error' between the two images is the
+	# sum of the squared difference between the two images;
+	# NOTE: the two images must have the same dimension
+	err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
+	err /= float(imageA.shape[0] * imageA.shape[1])
+	
+	# return the MSE, the lower the error, the more "similar"
+	# the two images are
+	return err
 
-         x = cell_width * ii
-         y = cell_height * jj
-
-         for x1 in range(x,x+cell_width):
-            for y1 in range(y,y + cell_height):
-               count += 1
-               if mask[y1,x1] == 255:
-                  cells += 1
-         ratios.append(cells / count)
-
-   return ratios
-
-def Guess_Letter(ratio):
-   global KNOWN
-   
-   # print(KNOWN)
+def Test_Number(number):
+   files = glob.glob("templates/*.jpg")
 
    guesses = []
+
+   for f in files:
+      mask = cv2.imread(f)
+      mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+
+      val = f[10]
+      score = mse(number,mask)
+      
+      guesses.append([val,score])
+
+   guesses = sorted(guesses, key=lambda x: x[1])
+
+   if guesses[0][1] > 10000:
+      return '?'
+   else:
+      return guesses[0][0]
+
+def Create_Empty(image,color=0):
+   new = np.zeros(image.shape[:2],dtype="uint8")
    
-   for ii in KNOWN:
-      diff = Ratio_Diff(ratio, ii[1])
-      if diff < 5:
-         guesses.append([diff, ii[0]])
+def Setup_Verifier(category):
+   
+   with open("./Answers.json") as f:
+      data = json.load(f)   
 
-   # print(len(guesses))
-
-
-   guesses = sorted(guesses,key= lambda x :x[0])
-
-
-
-   if guesses[0][0] < 0.00001:
-      # Letter is already known
-      letter = str(guesses[0][1])
-   elif s.train:
-      letter = input("Letter: ")
-      # Add it to the file
-      with open("learn.txt","a") as f:
-         temp = ",".join("%.3f" % x for x in ratio)
-         f.write("{}:{}\n".format(letter, temp))
-   else: # Lets just guess it
-      results = [i[1] for i in guesses]
-      guesses = guesses[:5]
-      probs = max(set(results), key = results.count) 
-      letter = probs
-
-
-   return letter
-
-
-def Ratio_Diff(a,b):
-   diff = 0
-
-   for ii in range(len(a)):
-      if b[ii] != 0:
-         val = (a[ii]-b[ii])
-         val = val**2
-         val = val / b[ii]
-
-         # val *= len(a)
-         diff += val
-
-   return diff
+   return data[category]

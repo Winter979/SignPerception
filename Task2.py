@@ -1,346 +1,280 @@
 import cv2
 import numpy as np
 
+import os
+
+from Settings import Settings as s
+
 from Tools import *
 
-def Find_Arrows(image):
- 
-   image = cv2.bilateralFilter(image,15,75,75)
 
-   mser = cv2.MSER_create()
+def Remove_Negatives(mask):
+   cnts = Get_Contours(mask)
+   
+   new = np.zeros(mask.shape[:2],dtype="uint8")
 
-   #Convert to gray scale
-   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-   th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,3,1)
-
-   regions, _ = mser.detectRegions(gray)
-   hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
-
-   mask = np.zeros((image.shape[0], image.shape[1], 1), dtype=np.uint8)
-   mask1 = np.zeros((image.shape[0], image.shape[1], 1), dtype=np.uint8)
-
-   arrows = []
-   poss = []
-
-   for c in hulls:
+   for c in cnts:
       x,y,w,h = cv2.boundingRect(c)
-
       area = w*h
+      
+      area2 = cv2.contourArea(c)
 
-      if 100 < area < 1000:
-         rect = cv2.minAreaRect(c)
-         (x1,x2),(w1,h1),angle = rect
+      rect = cv2.minAreaRect(c)
+      (x1,x2),(w1,h1),angle = rect
 
+      angle = abs(angle)
+
+      if 100 < area < 1100:
          ratio = h/w
          ratio2 = w1/h1
-         if Is_Arrow(ratio, ratio2, angle):
-            # arrows.append([c,x,y])
-            cv2.drawContours(mask, [c],0,255,-1)
+         if 1.2 < ratio < 4:
+               cv2.drawContours(new,[c],-1,255,-1)
+         elif Is_Arrow(ratio,ratio2,angle):
+            cv2.drawContours(new,[c],-1,255,-1)
          else:
-            # poss.append([c,x,y])
-            cv2.drawContours(mask1, [c],0,125,-1)
+            cv2.drawContours(new,[c],-1,100,-1)
+            
+   better = cv2.bitwise_and(new,mask)
 
-   # Merge the arrow contours
-   res = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-   cnts,_ = res if len(res) == 2 else res[1:3]
-
-   for c in cnts:
-      x,y,w,h = cv2.boundingRect(c)
-      arrows.append([c,x,y])
-   arrows = sorted(arrows, key=lambda x: x[1])
-
-   # Remove X outliers
-   old = arrows
-   arrows = []
-
-   mask = np.zeros((image.shape[0], image.shape[1], 1), dtype=np.uint8)
-
-   for ii in range(len(old)):
-      x = old[ii][1]
-      p = old[ii-1][1]
-      n = old[ii+1][1] if ii != len(old)-1 else 0
-
-      diff = min(abs(x-p),abs(x-n))
-
-      if diff < 10:
-         arrows.append(old[ii])
-         cv2.drawContours(mask, [old[ii][0]],0,255,-1)
-      else:
-         # cv2.drawContours(mask, [old[ii][0]],0,125,-1)
-         pass
-
-   # Filter possibilities
-   res = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-   cnts,_ = res    if len(res) == 2 else res[1:3]
-
-
-   for c in cnts:
-
-      if Close_Enough(arrows, c):
-         cv2.drawContours(mask, [c],0,255,-1)
-      else:
-         pass
-         # cv2.drawContours(mask, [c],0,125,0)
-
-      # x,y,w,h = cv2.boundingRect(c)
-      # poss.append([c,x,y])
-
-   return mask
-
-def Close_Enough(arrows, item):
-   x,y,w,h = cv2.boundingRect(item)
-
-
-   for c in arrows:
-      x1,y1,w1,h1 = cv2.boundingRect(c[0])
-
-      # Its behind it
-      if x > x1-(w/2):
-         continue
-
-      dx = x1-x
-
-      if 10 < dx < 4.5*w1:
-         dy = y1-y
-         if -5 < dy < 10:
-            if h > h1*1.1:
-               if w < w1 * 1.3:
-                  return True;
-   # print(w1)
-
-   return False
+   return better
 
 def Is_Arrow(r1,r2,a):
-   if 0.9<r1<1.1:
-      if 0.9<r2<1.1:
-         if 40 < abs(a) < 50:
+   if 0.8<r1<1.2:
+      if 0.8<r2<1.2:
+         if 35 < abs(a) < 55:
             return True
 
    return False
 
+def Get_Mask(image):
 
-# def Find_Negatives(image):
-   
-#    blur = cv2.bilateralFilter(image, 75, 50,50)
+   image = cv2.bilateralFilter(image, 50,75,75)
 
-#    gray,hsv = Cvt_All(blur)
+   gray,hsv = Cvt_All(image)
 
-#    mask = np.zeros(image.shape[:2],dtype="uint8")
+   lower = np.array([0,0,100])
+   upper = np.array([255,255,255])
+   defs_dark = cv2.inRange(hsv, lower, upper)
 
-#    colors = ["green", "red1","red2","yellow","sky","brown"]
-#    for c in colors:
-#       temp = Create_Mask(hsv, c)
-#       mask = cv2.bitwise_or(mask,temp)
+   th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+         cv2.THRESH_BINARY,9,-1)
 
-#    mask = cv2.medianBlur(mask, 3)
+   mask = th3.copy()
 
-#    return mask
 
-def Find_Missing_Letter(image, g):
-   x1,y1,w1,h1 = cv2.boundingRect(g[0])
-   x2,y2,w2,h2 = cv2.boundingRect(g[1])
+   # Didnt really work out to nicely
+   # white = Create_Mask(hsv, "white")
+   # mask = cv2.bitwise_and(mask,white)
+
+   green = Create_Mask(hsv,"green")
+   green = cv2.medianBlur(green, 21)
+   mask = cv2.bitwise_and(mask,~green)
+
+   sky = Create_Mask(hsv,"sky")
+   # sky = cv2.medianBlur(sky, 21)
+   mask = cv2.bitwise_and(mask,~sky)
+
+   gold = Create_Mask(hsv,"gold")
+   gold = cv2.medianBlur(gold, 21)
+   mask = cv2.bitwise_and(mask,~gold)
+
+   red = Create_Mask(hsv,"red")
+   red = cv2.medianBlur(red, 21)
+   mask = cv2.bitwise_and(mask,~red)
+
+   Trim_Edges(mask,color=0)
+
+   return mask
+
+def Clean(mask):
+   clean = mask.copy()
+
+   h,w = mask.shape[:2]
+
+   rng = 1
+
+   for x in range(rng,w-rng):
+      for y in range(rng,h-rng):
+         v1 = 0
+         v2 = 0
+         for ii in range(-rng,rng+1):
+            v1 += int(mask[y+ii,x])
+            v2 += int(mask[y,x+ii])
+
+         if v1 <= (rng*255) or v2 <= (rng*255):
+            # print(v)
+            clean[y,x] = 0
+
+   return clean
+
+def Find_Numbers(mask):
+   cnts = Get_Contours(mask)
+
+   letters = []
+
+   for c in cnts:
+      x,y,w,h = cv2.boundingRect(c)
+
+      crop = mask[y:y+h,x:x+w]
+      crop = cv2.resize(crop,(50,50))
+
+      guess = Test_Number(crop)
+
+      if guess != '?':
+         letters.append([guess,x,y,c])
+         # cv2.rectangle(image, (x-2,y-2),(x+w+2,y+h+2), (0,0,255), 1)
+
+   # Sort by y
+   letters = sorted(letters, key=lambda x: x[2])
+
+   return letters
+
+def Group_Letters(letters):
+   groups = []
+
+   y_rng = 10
+
+   g_id = 0
+
+   # Start the first group
+   groups.append([letters[0]])
+
+   # Skip the first one
+   for ii in range(1,len(letters)):
+      c = letters[ii][2]
+      p = letters[ii-1][2]
+
+      if not abs(c-p) < y_rng:
+         g_id += 1
+         groups.append([])
+
+      groups[g_id].append(letters[ii])
+
+   better = []
+
+   for g in groups:
+      # It isnt a group
+      if len(g) < 3:
+         continue 
+
+      g = sorted(g, key=lambda x: x[1])
+
+      better.append(g)
+   return better
+
+def Find_Missing(letters,image,mask):
+   letters = sorted(letters, key=lambda x: x[1])
+
+   x1,y1,w1,h1 = cv2.boundingRect(letters[0][3])
+   x2,y2,w2,h2 = cv2.boundingRect(letters[1][3])
 
    buff = 2
 
-   x = x1 - (x2-x1)- 1
+   x = x1 - (x2-x1)- buff
    y = y1 - (y2-y1)- buff
 
-   x2 = x+int((w1+w2)/2) + 3*buff
-   y2 = y+int((h1+h2)/2) + 2*buff
 
-   # cv2.rectangle(image,(x,y),(x2,y2),(255,0,255),1)
-   crop = image[y:y2,x:x2]
+   w = int((w1+w2)/2) + 3*buff
+   h = int((h1+h2)/2) + 3*buff
 
+   crop = image[y:y+h,x:x+w]
    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-   # _,mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+   mask2 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+            cv2.THRESH_BINARY,3,0)
 
-   mask = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,15,5)
+   crop2 = mask[y:y+h,x:x+w]
 
-   Trim_Edges(mask, width=1, color=0)
+   better = cv2.bitwise_and(mask2, crop2)
 
-   res = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-   cnts,_ = res if len(res) == 2 else res[1:3]
+   Trim_Edges(better, color=0, width=1)
 
-   cnt = sorted(cnts, key=lambda x: cv2.boundingRect(x)[2]*cv2.boundingRect(x)[3])
-   cnt = cnt[-1]
+   cnts = Get_Contours(better)
+   cnts = sorted(cnts,key=lambda x: cv2.contourArea(x))
 
-   x3,y3,w3,h3 = cv2.boundingRect(cnt)
+   c = cnts[-1]
+   cv2.drawContours(better,[c],0,255,-1)
+   x3,y3,w3,h3 = cv2.boundingRect(c)
+   better2 = better[y3:y3+h3,x3:x3+w3]
+   better2 = cv2.resize(better2,(50,50))
 
-   x1 = x+x3
-   y1 = y+y3
+   guess = Test_Number(better2)
 
-   x2 = x+w3
-   y2 = y+h3
+   c+=(x,y)
 
-   better_cnt = cnt.copy()
-
-   better_cnt += (x,y)
-
-   # crop = image[y1:y2,x1:x2]
-
-   # cv2.rectangle(image,(x1,y1),(x2,y2),(0,255,255),1)
-   # cv2.imshow("mask",mask)
-   # cv2.imshow("crop",crop)
-   # cv2.imshow("image",image)
+   # cv2.imshow("mask2",mask2)
+   # cv2.imshow("better",better)
+   # cv2.imshow("better2",better2)
+   # cv2.imshow("crop2",crop2)
    # cv2.waitKey(0)
+   return [guess,x+x3,y+y3,c]
 
-   return better_cnt
+   # h = h1
+   # x = x1 - int(max(w1,w2) * 1.2)
+   # y = y1 - (y2-y1)
+   # w = max(w1,w2)
 
-def Magic(image, mask):
-   res = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-   cnts,_ = res if len(res) == 2 else res[1:3]
+   cv2.rectangle(image, (x,y),(x+w,y+h), (255,0,255), 1)
 
-   groups = []
+   crop = mask[y:y+h,x:x+w]
+   cnts = Get_Contours(crop)
 
-   # Sort by Y
-   cnts = sorted(cnts, key=lambda x: cv2.boundingRect(x)[1])
+   # c = cnts[0]
+   # x3,y3,w3,h3 = cv2.boundingRect(c)
+   # crop = crop[y3:y3+h3,x3:x3+w3]
+   # crop = cv2.resize(crop,(50,50))
+   # crop[np.where(crop != 0)] = 255
 
-   sort = cnts
-   cnts = []
+   # guess = Test_Number(crop)
 
-   groups = []
-   new = []
-   new.append(sort[0])
-
-   pY = cv2.boundingRect(sort[0])[1]
-
-   for ii in range(1,len(sort)):
-      y = cv2.boundingRect(sort[ii])[1]
-      if -10 < y-pY < 10:
-         new.append(sort[ii])
-      else:
-         groups.append(new)
-         new = []
-         new.append(sort[ii])
-      pY = y
-
-   groups.append(new)
+   # c+=(x,y)
 
 
-   for g in groups:
-      while len(g) > 4:
-         g.pop(0)
 
-      g = sorted(g, key=lambda x: cv2.boundingRect(x)[0])
+def Main(files):
 
-      word = ""
-
-      # We gotta guess the first one
-      if len(g) == 3:
-         c = Find_Missing_Letter(image, g)
-         
-         g.insert(0,c)
-
-         # if s.train:
-         #    cv2.imshow("temp",mask)
-         #    cv2.waitKey(0)
-
-         # ratio = Get_Ratio(mask)
-         # word += Guess_Letter(ratio)
-
-         # if s.train:
-         #    cv2.destroyWindow("temp")
-
-      for c in g:
-         x,y,w,h = cv2.boundingRect(c)
-         cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),1)
-
-         crop = image[y:y+h,x:x+w]
-         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-         _,mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-         if s.train:
-            cv2.imshow("temp",mask)
-            cv2.waitKey(0)
-
-         ratio = Get_Ratio(mask)
-         word += Guess_Letter(ratio)
-
-         if s.train:
-            cv2.destroyWindow("temp")
+   answers = Setup_Verifier("Directional")
 
 
-      print(word)
-   
-# def DefsNot(image):
-#    # mask = np.zeros(image.shape[:2],dtype="uint8")
-
-#    # blur = cv2.bilateralFilter(image, 75, 50,50)
-
-#    gray,hsv = Cvt_All(image)
-
-#    # colors = ["green", "red1","red2","yellow","brown","sky","dark"]
-#    # for c in colors:
-#    #    temp = Create_Mask(hsv, c)
-#    #    mask = cv2.bitwise_or(mask,temp)
-
-#    lower = np.array([0,80,0])
-#    upper = np.array([255,255,255])
-#    ok = cv2.inRange(hsv, lower, upper)
-
-#    # sky = Get_The_Sky(image)
-#    # mask = cv2.bitwise_or(mask,sky)
-
-#    return ok
-
-
-def Get_Borders(image):
-   gray,_ = Cvt_All(image)
-
-   # n0 = DefsNot(image)
-
-   idk = np.ones(image.shape[:2],dtype="uint8") * 255
-
-   ret,temp = cv2.threshold(image,100,255,cv2.THRESH_BINARY)
-
-   th1 = np.zeros(image.shape[:2],dtype="uint8")
-   th1[np.where((temp == [255,255,255]).all(axis=2))] = 255
-
-   th2 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,7,5)
-
-   th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,25,0)
-
-   th4 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,55,0)
-
-   th5 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,99,5)
-
-   idk = cv2.bitwise_and(idk, th1)
-   idk = cv2.bitwise_and(idk, th2)
-   idk = cv2.bitwise_and(idk, th3)
-   idk = cv2.bitwise_and(idk, th4)
-   idk = cv2.bitwise_and(idk, th5)
-   # idk = cv2.bitwise_and(idk, ~n0)
-
-   return idk
-
-def main(files):
    for f in files:
+
+      fname = os.path.basename(f).split(".")[0]
+
       image = cv2.imread(f)
 
-      temp = image.copy()
+      mask = Get_Mask(image)
 
+      mask = Clean(mask)
 
-      # idk = Get_Borders(image)
-      # temp = cv2.bitwise_and(temp,temp, mask=idk)
-      # idk = DefsNot(image)
-      # temp = cv2.bitwise_and(temp,temp, mask=~idk)
+      better = Remove_Negatives(mask)
 
-      # canny = cv2.Canny(temp, 200, 220)
+      letters = Find_Numbers(better)
 
-      new = Find_Arrows(image)
+      groups = Group_Letters(letters)
 
-      Magic(image, new)
+      ii = 0
+      for g in groups:
 
+         if len(g) == 3:
+            guess = Find_Missing(g, image, mask)
+            g.insert(0,guess)
+
+         for c in g:
+            x,y,w,h = cv2.boundingRect(c[3])  
+            buf = 0
+            cv2.rectangle(image, (x-buf,y-buf),(x+w+buf,y+h+buf), (0,0,255), 1)
+
+         number = "".join([ii[0] for ii in g])
+
+         answer = answers[fname][ii]
+         
+         print(answer,number)
+
+         ii += 1 
+
+      cv2.imshow("better",better)
+      cv2.imshow("mask",mask)
       cv2.imshow("image",image)
-      # cv2.imshow("canny",canny)
-      # cv2.imshow("new",new)
-      # cv2.imshow("idk",idk)
       cv2.waitKey(0)
-      
+
+if __name__ == "__main__":
+   pass

@@ -56,9 +56,9 @@ if __name__ == "__main__":
    s.train = args.train
 
    if task_no == 1:
-      t1.main(files)
+      t1.Main(files)
    elif task_no == 2:
-      t2.main(files)
+      t2.Main(files)
    # except Exception as e:
    #    print(e)
    
