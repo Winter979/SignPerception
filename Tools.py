@@ -44,10 +44,12 @@ with open("./learn.txt") as f:
       ratios = [float(ii) for ii in line[2:].split(",")]
       KNOWN.append([res,ratios])
 
+
+
 def Gold_Mask(image):
    gray,hsv = Cvt_All(image)
 
-   lower = np.array([10,100,100])
+   lower = np.array([10,100,100]) 
    upper = np.array([80,255,255])
    inrange = cv2.inRange(hsv, lower, upper)
 
@@ -170,9 +172,10 @@ def Test_Number(number):
 
    guesses = sorted(guesses, key=lambda x: x[1])
 
-   if guesses[0][1] > 10000:
+   if guesses[0][1] > 15000:
       return '?'
    else:
+      # print(guesses[0][1])
       return guesses[0][0]
 
 def Create_Empty(image,color=0):

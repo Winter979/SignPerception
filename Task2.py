@@ -27,12 +27,13 @@ def Remove_Negatives(mask):
       if 100 < area < 1100:
          ratio = h/w
          ratio2 = w1/h1
-         if 1.2 < ratio < 4:
-               cv2.drawContours(new,[c],-1,255,-1)
+         if 1.25 < ratio < 4:
+            cv2.drawContours(new,[c],-1,255,-1)
          elif Is_Arrow(ratio,ratio2,angle):
             cv2.drawContours(new,[c],-1,255,-1)
          else:
-            cv2.drawContours(new,[c],-1,100,-1)
+            pass
+            # cv2.drawContours(new,[c],-1,100,-1)
             
    better = cv2.bitwise_and(new,mask)
 
@@ -162,13 +163,39 @@ def Group_Letters(letters):
       better.append(g)
    return better
 
+def Clean_Better(mask):
+   h,w = mask.shape[:2]
+
+   new = mask.copy()
+
+   rng = 1
+
+   for x in range(0,w-rng):
+      for y in range(0,h-rng):
+         v1 = 0
+         v2 = 0
+
+         v1 += mask[y,x]
+         v1 += mask[y+1,x+1]
+         v2 += mask[y+1,x]
+         v2 += mask[y,x+1] 
+
+         if (v1 == 0 and v2 == 510) or (v2 == 0 and v1 == 510):
+            new[y,x] = 0
+            new[y+1,x] = 0
+            new[y,x+1] = 0
+            new[y+1,x+1] = 0
+
+   return new
+
+
 def Find_Missing(letters,image,mask):
    letters = sorted(letters, key=lambda x: x[1])
 
    x1,y1,w1,h1 = cv2.boundingRect(letters[0][3])
    x2,y2,w2,h2 = cv2.boundingRect(letters[1][3])
 
-   buff = 2
+   buff = 4
 
    x = x1 - (x2-x1)- buff
    y = y1 - (y2-y1)- buff
@@ -180,18 +207,24 @@ def Find_Missing(letters,image,mask):
    crop = image[y:y+h,x:x+w]
    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
    mask2 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
-            cv2.THRESH_BINARY,3,0)
+            cv2.THRESH_BINARY,5,1)
 
    crop2 = mask[y:y+h,x:x+w]
 
    better = cv2.bitwise_and(mask2, crop2)
 
+   better = Clean_Better(better)
+
    Trim_Edges(better, color=0, width=1)
 
-   cnts = Get_Contours(better)
+   res = cv2.findContours(better, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+
+   # cnts = Get_Contours(better)
    cnts = sorted(cnts,key=lambda x: cv2.contourArea(x))
 
    c = cnts[-1]
+   better[np.where(better != 0)] = 0
    cv2.drawContours(better,[c],0,255,-1)
    x3,y3,w3,h3 = cv2.boundingRect(c)
    better2 = better[y3:y3+h3,x3:x3+w3]
@@ -202,6 +235,7 @@ def Find_Missing(letters,image,mask):
    c+=(x,y)
 
    # cv2.imshow("mask2",mask2)
+   # # cv2.imshow("better3",better3)
    # cv2.imshow("better",better)
    # cv2.imshow("better2",better2)
    # cv2.imshow("crop2",crop2)
@@ -228,7 +262,42 @@ def Find_Missing(letters,image,mask):
 
    # c+=(x,y)
 
+def Find_Gray(image):
 
+   image = cv2.bilateralFilter(image, 15,25,25)
+
+   h,w = image.shape[:2]
+
+   mask = np.zeros(image.shape[:2],dtype="uint8")
+
+   min_value = 100
+   var = 30
+
+   for y in range(h):
+      row = image[y]
+      for x in range(w):
+         avg = sum(row[x]) / 3
+
+         # Not dark enough
+         if avg < min_value:
+            continue
+
+         # Is the variance to big?
+         valid = True
+         for ii in range(3):
+            if abs(image[y,x,ii] - avg) > var:
+               valid = False
+
+         if not valid:
+            continue
+
+         if avg > 100:
+            mask[y,x] = 255
+
+
+   # mask = cv2.medianBlur(mask,3)
+
+   return mask
 
 def Main(files):
 
@@ -252,6 +321,7 @@ def Main(files):
       groups = Group_Letters(letters)
 
       ii = 0
+      print("="*20)
       for g in groups:
 
          if len(g) == 3:
@@ -264,9 +334,7 @@ def Main(files):
             cv2.rectangle(image, (x-buf,y-buf),(x+w+buf,y+h+buf), (0,0,255), 1)
 
          number = "".join([ii[0] for ii in g])
-
          answer = answers[fname][ii]
-         
          print(answer,number)
 
          ii += 1 
@@ -277,4 +345,16 @@ def Main(files):
       cv2.waitKey(0)
 
 if __name__ == "__main__":
-   pass
+   files = glob.glob("DirectionalSignage/*")
+
+   for f in files:
+      image = cv2.imread(f)
+
+      gray = Find_Gray(image)
+
+      cv2.imshow("image",image)
+      cv2.imshow("gray",gray)
+      cv2.waitKey(0)
+
+   # Main(files)
+

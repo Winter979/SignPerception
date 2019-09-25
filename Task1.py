@@ -64,9 +64,9 @@ def Get_Mask(image):
 
    gray,hsv = Cvt_All(image)
 
-   lower = np.array([0,0,100])
-   upper = np.array([255,255,255])
-   defs_dark = cv2.inRange(hsv, lower, upper)
+   # lower = np.array([0,0,100])
+   # upper = np.array([255,255,255])
+   # defs_dark = cv2.inRange(hsv, lower, upper)
 
    th3 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
          cv2.THRESH_BINARY,15,-5)

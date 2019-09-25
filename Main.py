@@ -6,12 +6,14 @@ from Settings import Settings as s
 
 import Task1 as t1
 import Task2 as t2
+import Test as t
 
 def Setup_Args():
    parser = argparse.ArgumentParser(description="Analyze Packet Dump for anomalies")
    parser.add_argument("-t","--task", dest="task", help="The task that is to be executed")
    parser.add_argument("-f","---files", dest="files", help="The files that will be tested against")
    parser.add_argument("-v","--verbose",dest="verbose", action="store_true", help="Enable verbose mode")
+   parser.add_argument("--test",dest="test", action="store_true", help="Runs with the test script")
    parser.add_argument("-s","--show",dest="show", action="store_true", help="Display the images")
    parser.add_argument("-m","--manual", dest="manual", help="Manually select a single image")
    parser.add_argument("--train",dest="train",action="store_true",help="Manually enter the results to train it")
@@ -48,16 +50,19 @@ if __name__ == "__main__":
 
    # try:
 
-   task_no = int(args.task)
+   s.task = int(args.task)
 
-   files = Get_Files(task_no,args.files)
+   files = Get_Files(s.task,args.files)
 
    s.show = args.show
    s.train = args.train
+   s.test = args.test
 
-   if task_no == 1:
+   if s.test:
+      t.Main(files)
+   elif s.task == 1:
       t1.Main(files)
-   elif task_no == 2:
+   elif s.task == 2:
       t2.Main(files)
    # except Exception as e:
    #    print(e)

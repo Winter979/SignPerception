@@ -3,6 +3,7 @@ class Settings:
    draw = True
    verbose = False
 
+   task = 1
    train = False
 
    T1_Images="BuildingSignage"

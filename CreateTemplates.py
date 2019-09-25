@@ -61,11 +61,50 @@ def Numbers():
       crop = th[y:y+h,x:x+w]
       crop = cv2.resize(crop,(50,50))
 
-      cv2.imwrite("templates/{}.jpg".format(val),crop)
+      cv2.imwrite("templates/numbers/{}.jpg".format(val),crop)
+
+      val += 1
+
+def Alphabet():
+   image = cv2.imread("alphabet2.png")
+
+   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+   _,th = cv2.threshold(gray, 125, 255, cv2.THRESH_BINARY_INV)
+
+   res = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+   cnts,_ = res if len(res) == 2 else res[1:3]
+
+
+   better = []
+
+   for c in cnts:
+      x,y,w,h = cv2.boundingRect(c)
+      # print(h)
+      # continue
+      # Remove the non numbers
+      if h > 21:
+         better.append([x,c])
+
+   better = sorted(better, key=lambda x: x[0])
+
+   better = [ii[1] for ii in better]
+
+   val = ord('A')
+
+   for c in better:
+
+      x,y,w,h = cv2.boundingRect(c)
+
+      crop = th[y:y+h,x:x+w]
+      crop = cv2.resize(crop,(50,50))
+
+      cv2.imwrite("templates/lower/{}_l.jpg".format(chr(val)),crop)
 
       val += 1
 
 if __name__ == "__main__":
+   # Alphabet()
    Arrows()
    
 
