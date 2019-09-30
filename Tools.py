@@ -4,7 +4,7 @@ import glob
 
 import json
 
-from Settings import Settings as s
+from Settings import Settings
 
 class Colrs:
    RED      = "\033[1;31m"  
@@ -45,6 +45,12 @@ with open("./learn.txt") as f:
       KNOWN.append([res,ratios])
 
 
+def Dilate(image, size):
+   kernel = np.ones(size, np.uint8) 
+   dilated = cv2.dilate(image, kernel, iterations=1) 
+
+   return dilated
+
 
 def Gold_Mask(image):
    gray,hsv = Cvt_All(image)
@@ -80,7 +86,7 @@ def Get_The_Sky(image):
    mask = cv2.inRange(hsv,lower,upper)
    return mask
 
-def Create_Mask(image, color):
+def HSV_Mask(image, color):
 
 
    if color == "red":
@@ -145,17 +151,15 @@ def Get_Contours(mask):
 
 
 def mse(imageA, imageB):
-	# the 'Mean Squared Error' between the two images is the
-	# sum of the squared difference between the two images;
-	# NOTE: the two images must have the same dimension
-	err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
-	err /= float(imageA.shape[0] * imageA.shape[1])
-	
-	# return the MSE, the lower the error, the more "similar"
-	# the two images are
-	return err
+	score = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
+	score /= float(imageA.shape[0] * imageA.shape[1])
+
+	return score
 
 def Test_Number(number):
+
+   
+
    files = glob.glob("templates/*.jpg")
 
    guesses = []
@@ -171,18 +175,25 @@ def Test_Number(number):
 
    guesses = sorted(guesses, key=lambda x: x[1])
 
+
    if guesses[0][1] > 15000:
       return '?'
    else:
-      # print(guesses[0][1])
       return guesses[0][0]
 
 def Create_Empty(image,color=0):
-   new = np.zeros(image.shape[:2],dtype="uint8")
+   new = np.ones(image.shape[:2],dtype="uint8") * color
    
-def Setup_Verifier(category):
+   return new
+
+def Setup_Verifier():
    
    with open("./Answers.json") as f:
       data = json.load(f)   
+
+   if Settings.task == 1:
+      category = "Building"
+   elif Settings.task == 2:
+      category = "Directional"
 
    return data[category]
