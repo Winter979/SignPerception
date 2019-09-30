@@ -1,3 +1,14 @@
+'''
+File: Main.py
+File Created: Monday, 30th September 2019 7:49:43 pm
+Author: Jonathon Winter
+-----
+Last Modified: Monday, 30th September 2019 11:29:40 pm
+Modified By: Jonathon Winter
+-----
+Purpose: 
+'''
+
 import sys
 import argparse
 import glob
@@ -11,11 +22,11 @@ import Task as t
 def Setup_Args():
    parser = argparse.ArgumentParser(description="Analyze Packet Dump for anomalies")
    parser.add_argument("-t","--task", dest="task", help="The task that is to be executed")
-   parser.add_argument("-f","---files", dest="files", help="The files that will be tested against")
-   parser.add_argument("-v","--verbose",dest="verbose", action="store_true", help="Enable verbose mode")
-   parser.add_argument("--test",dest="test", action="store_true", help="Runs with the test images")
+   parser.add_argument("-f","--files", dest="files", help="The files that will be tested against")
    parser.add_argument("-s","--show",dest="show", action="store_true", help="Display the images")
-   parser.add_argument("-m","--manual", dest="manual", help="Manually select a single image")
+   # parser.add_argument("-v","--verbose",dest="verbose", action="store_true", help="Enable verbose mode")
+   parser.add_argument("--test",dest="test", action="store_true", help="Runs with the test images")
+   # parser.add_argument("-m","--manual", dest="manual", help="Manually select a single image")
    return parser.parse_args()
 
 def Get_Files(task_no, file_no):
@@ -48,8 +59,9 @@ if __name__ == "__main__":
    args = Setup_Args()
 
    Settings.task = int(args.task)
+   Settings.test = int(args.test)
 
-   if args.test:
+   if Settings.test:
       files = Get_Files(Settings.task,args.files)
 
    Settings.show = args.show

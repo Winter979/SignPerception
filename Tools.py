@@ -1,3 +1,14 @@
+'''
+File: Tools.py
+File Created: Monday, 30th September 2019 7:49:43 pm
+Author: Jonathon Winter
+-----
+Last Modified: Tuesday, 1st October 2019 12:17:25 am
+Modified By: Jonathon Winter
+-----
+Purpose: 
+'''
+
 import cv2
 import numpy as np
 import glob
@@ -36,15 +47,6 @@ MASKS = {
              [np.array([160, 80, 100]) , np.array([180,255,255])]],
 }
 
-KNOWN = []
-with open("./learn.txt") as f:
-   lines = f.read().splitlines()
-   for line in lines:
-      res = line[0]
-      ratios = [float(ii) for ii in line[2:].split(",")]
-      KNOWN.append([res,ratios])
-
-
 def Dilate(image, size):
    kernel = np.ones(size, np.uint8) 
    dilated = cv2.dilate(image, kernel, iterations=1) 
@@ -52,42 +54,42 @@ def Dilate(image, size):
    return dilated
 
 
-def Gold_Mask(image):
-   gray,hsv = Cvt_All(image)
-
-   lower = np.array([10,100,100]) 
-   upper = np.array([80,255,255])
-   inrange = cv2.inRange(hsv, lower, upper)
-
-   inrange = cv2.medianBlur(inrange, 25)
-
-   # Trim_Edges(inrange)
-
-   # res = cv2.findContours(inrange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-   # cnts,_ = res if len(res) == 2 else res[1:3]
+def Draw_Findings(image, results):
    
-   # for c in cnts:
-   #    area = cv2.contourArea(c)
+   ii = 0
+   for res in results:
+      x,y,w,h = res["shape"]
+      cv2.imshow("letter-{}".format(ii),image[y:y+h,x:x+w])
 
-   #    if area < 1000:
-   #       cv2.drawContours(inrange, [c], 0, 255, -1)
-         
-   # inrange[np.where(inrange != 0)] = 255
+      ii += 1
 
-   return inrange
+   x,y,w,h = results[0]["shape"]
+
+   x1 = x
+   x2 = x + w
+   y1 = y
+   y2 = y + h
+
+   for res in results:
+      x,y,w,h = res["shape"]
+
+      x1 = x if x < x1 else x1
+      x2 = x + w if x + w > x2 else x2
+      y1 = y if y < y1 else y1
+      y2 = y + h if y+h > y2 else y2
 
 
-def Get_The_Sky(image):
-   hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+   if Settings.task == 1:
+      buf = 10
+   else:
+      buf = 0
 
-   lower = np.array([100,60,200])
-   upper = np.array([140,255,255])
+   print("DRAW")
 
-   mask = cv2.inRange(hsv,lower,upper)
-   return mask
+   cv2.imshow("Number Group",image[y1-buf:y2+buf,x1-buf:x2+buf])
+   cv2.rectangle(image, (x1-buf,y1-buf),(x2+buf,y2+buf),(0,0,255),1)
 
 def HSV_Mask(image, color):
-
 
    if color == "red":
       lower, upper = MASKS[color][0]
@@ -109,7 +111,7 @@ def HSV_Mask(image, color):
    return mask
 
 
-def Trim_Edges(mask, color = 255, width=3):
+def Trim_Edges(mask, color = 255, width=1):
    pack = mask.shape
 
    h,w = pack[:2]
@@ -130,12 +132,6 @@ def Trim_Edges(mask, color = 255, width=3):
       for ii in range(width):
          mask[y,w-1-ii] = color
 
-def Apply_Mask_Image(image, mask):
-   new = image.copy()
-
-   new[np.where(mask != 0)] = [255,255,255]
-
-   return new
 
 def Cvt_All(image):
    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -149,37 +145,6 @@ def Get_Contours(mask):
 
    return cnts
 
-
-def mse(imageA, imageB):
-	score = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
-	score /= float(imageA.shape[0] * imageA.shape[1])
-
-	return score
-
-def Test_Number(number):
-
-   
-
-   files = glob.glob("templates/*.jpg")
-
-   guesses = []
-
-   for f in files:
-      mask = cv2.imread(f)
-      mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-
-      val = f[10]
-      score = mse(number,mask)
-      
-      guesses.append([val,score])
-
-   guesses = sorted(guesses, key=lambda x: x[1])
-
-
-   if guesses[0][1] > 15000:
-      return '?'
-   else:
-      return guesses[0][0]
 
 def Create_Empty(image,color=0):
    new = np.ones(image.shape[:2],dtype="uint8") * color

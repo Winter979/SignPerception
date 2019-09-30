@@ -1,10 +1,10 @@
 class Settings:
-   show = True
-   draw = True
+   show = False
    verbose = False
 
    task = 1
-   train = False
+   test = False
+
 
    T1_Images="BuildingSignage"
    T2_Images="DirectionalSignage"
