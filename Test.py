@@ -91,7 +91,12 @@ def Extract_Numbers(mask):
       if Is_It_Something(c):
          letter = What_Is_It(c,mask)
          if letter != '?':
-            results.append([c,letter])
+            result = {}
+
+            result["contour"] = c
+            result["letter"] = letter
+            result["shape"] = cv2.boundingRect(c)
+            results.append(result)
             # cv2.drawContours(new, [c],0,255,-1)
          # else:
          #    cv2.drawContours(new, [c],0,125,-1)
@@ -128,7 +133,7 @@ def Create_Mask(image):
 
    gray,hsv = Cvt_All(blur)
 
-   th = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY, 9 ,-1)
+   th = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY, 15 ,-5)
 
    inrange = cv2.inRange(hsv,(0,0,100),(255,70,255))
 
@@ -136,68 +141,66 @@ def Create_Mask(image):
 
    return mask 
 
+def Find_Numbers_1(results,mask,image):
+
+   results = Sort_Results(results,"Y")
+   results = Group_Results(results,"Y")
+
+   better = []
+
+   for res in results:
+      if len(res) >= 3:
+         better.append(res)
+
+   # better = results
+
+   # Its generally the 3 largest ones. 
+   # better = results[-3:]
+   # better = Sort_Results(better, "X")
+   return better
+
+def Find_Numbers_2(results,mask,image):
+   pass
+
 def Group_Numbers(results, mask, image):
    better = []
 
    if Settings.task == 1:
-      by_h = []
-      for r in results:
-         s = cv2.boundingRect(r[0])
-         by_h.append([s,r])
-
-      by_h = sorted(by_h, key=lambda x: x[0][3], reverse=True)
-
-      largest = by_h[:3]
-      better = [ii[1] for ii in largest]
-
-
+      better = Find_Numbers_1(results,mask,image)
    elif Settings.task == 2:
-      by_y = []
-      for r in results:
-         s = cv2.boundingRect(r[0])
-         by_y.append([s,r])
-
-      by_y = sorted(by_y, key=lambda x: x[0][1])
-
-      groups = []
-      g_id = 0
-      y_rng = 10
-
-      groups.append([by_y[0]])
-      for ii in range(1,len(by_y)):
-         curr = by_y[ii][0][1]
-         prev = by_y[ii-1][0][1]
-
-         if abs(curr - prev) > y_rng:
-            g_id += 1
-            groups.append([]) 
-
-         groups[g_id].append(by_y[ii])
-
-      good_groups = []
-
-      for g in groups:
-
-         g = sorted(g,key=lambda x: x[0][0])
-
-         g = [ii[1] for ii in g]
-         
-         if len(g) >= 4:
-            good_groups.append(g)
-         elif len(g) == 3:
-            # missing = Find_Missing(g,image,mask)
-            good_groups.append(g)
-      better = good_groups
-      # better = [ii[1] for ii in good_groups[0]]
+      better = Find_Numbers_2(results,mask,image)
 
    return better
 
+def Sort_Results(results,by):
+   idx = { "X":0, "Y":1, "W":2, "H":3 }
+
+   return sorted(results, key=lambda x: x["shape"][idx[by]])
+
+def Group_Results(results,by,rng=10):
+   idx = { "X":0, "Y":1, "W":2, "H":3 }
+
+   groups = []
+
+   groups.append([results[0]])
+   prev = results[0]["shape"][idx[by]]
+   for res in results[1:]:
+      curr = res["shape"][idx[by]]
+      if abs(curr - prev) > rng:
+         groups.append([])
+
+      groups[-1].append(res)
+      prev = curr
+
+   return groups
+
+
+def Sort_By_X(results):
+   pass
 
 def Main(files):
-   mser = cv2.MSER_create()
-
    for f in files:
-      image = cv2.imread(f);
+      image = cv2.imread(f)
 
       mask = Create_Mask(image) 
 
@@ -205,24 +208,33 @@ def Main(files):
 
       filtered = Group_Numbers(results,mask, image)
 
-      if Settings.task == 1:
+      for group in filtered:
          label = ""
-         for res in filtered:
-            x,y,w,h = cv2.boundingRect(res[0])
+         for res in group:
+            x,y,w,h = res["shape"]
+            label += res["letter"]
             cv2.rectangle(image, (x,y),(x+w,y+h), (0,0,255), 1)
+         print(label)   
 
-         print(label)
-      elif Settings.task == 2:
-         for g in filtered:
-            label = ""
-            for res in g:
-               x,y,w,h = cv2.boundingRect(res[0])
-               label += res[1]
-               cv2.rectangle(image, (x,y),(x+w,y+h), (0,0,255), 1)
-            print(label)
+      # if Settings.task == 1:
+      #    label = ""
+      #    for res in filtered:
+      #       x,y,w,h = res["shape"]
+      #       label += res["letter"]
+      #       cv2.rectangle(image, (x,y),(x+w,y+h), (0,0,255), 1)
+      #    print(label)
+
+      # elif Settings.task == 2:
+      #    for g in filtered:
+      #       label = ""
+      #       for res in g:
+      #          x,y,w,h = cv2.boundingRect(res[0])
+      #          label += res[1]
+      #          cv2.rectangle(image, (x,y),(x+w,y+h), (0,0,255), 1)
+      #       print(label)
 
       cv2.imshow('image', image)
-      # cv2.imshow('blur', blur)
+      cv2.imshow('gold', gold)
       cv2.imshow("mask",mask)
       # cv2.imshow("th",th)
       # cv2.imshow("ultimate",ultimate)

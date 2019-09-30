@@ -53,20 +53,20 @@ def Gold_Mask(image):
    upper = np.array([80,255,255])
    inrange = cv2.inRange(hsv, lower, upper)
 
-   inrange = cv2.medianBlur(inrange, 5)
+   inrange = cv2.medianBlur(inrange, 25)
 
    # Trim_Edges(inrange)
 
-   res = cv2.findContours(inrange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-   cnts,_ = res if len(res) == 2 else res[1:3]
+   # res = cv2.findContours(inrange, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+   # cnts,_ = res if len(res) == 2 else res[1:3]
    
-   for c in cnts:
-      area = cv2.contourArea(c)
+   # for c in cnts:
+   #    area = cv2.contourArea(c)
 
-      if area < 1000:
-         cv2.drawContours(inrange, [c], 0, 255, -1)
+   #    if area < 1000:
+   #       cv2.drawContours(inrange, [c], 0, 255, -1)
          
-   inrange[np.where(inrange != 0)] = 255
+   # inrange[np.where(inrange != 0)] = 255
 
    return inrange
 
@@ -134,7 +134,6 @@ def Apply_Mask_Image(image, mask):
 def Cvt_All(image):
    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-   hsl = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
 
    return gray, hsv
 
